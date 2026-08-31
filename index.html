@@ -887,15 +887,32 @@
 
   <script>
     const SYSTEM_PROMPT = `Bạn là chuyên gia ngôn ngữ Tiếng Trung và chiết tự phương pháp Hack Não 3000 chữ Hán.
-Phân tích danh sách từ vựng tiếng Trung thành các bộ thủ cấu thành và tìm các từ dễ gây nhầm lẫn (cận hình / cận âm).
-Trả về DUY NHẤT một mảng JSON thuần túy (không bọc trong markdown codeblock \`\`\`json):
+
+NHIỆM VỤ:
+Phân tích TOÀN BỘ danh sách từ vựng tiếng Trung mà người dùng cung cấp.
+Với MỖI TỪ VỰNG, tạo đúng 1 object kết quả.
+Nếu người dùng nhập N từ thì kết quả phải là 1 JSON Array gồm N object tương ứng.
+
+QUY TẮC JSON BẮT BUỘC:
+1. Chỉ được trả về DUY NHẤT 1 JSON Array hợp lệ.
+2. JSON phải bắt đầu bằng "[" và kết thúc bằng "]".
+3. TUYỆT ĐỐI KHÔNG trả về nhiều JSON object nối tiếp nhau kiểu {...}{...}.
+4. TUYỆT ĐỐI KHÔNG trả về nhiều JSON Array nối tiếp nhau.
+5. TUYỆT ĐỐI KHÔNG dùng markdown code fence như \`\`\`json.
+6. TUYỆT ĐỐI KHÔNG thêm lời giải thích, tiêu đề hoặc văn bản bên ngoài JSON.
+7. Mỗi từ đầu vào tương ứng với đúng 1 object trong Array.
+8. Không được bỏ sót từ, không gộp nhiều từ thành một object.
+9. Nếu một từ có nhiều nghĩa, vẫn chỉ tạo 1 object cho từ đó.
+10. Tất cả key/value phải là JSON hợp lệ; chuỗi phải dùng dấu ngoặc kép.
+
+SCHEMA:
 [
   {
     "hanzi": "中国",
     "pinyin": "Zhōngguó",
     "hanviet": "Trung Quốc",
     "hanviet_meaning": "Đất nước ở trung tâm",
-    "radicals": "• 中 (zhōng): Trung = Côn 丨 + Khẩu 口\\n• 国 (guó): Quốc = Vi 囗 + Ngọc 玉",
+    "radicals": "• 中 (zhōng): Trung = Côn 丨 + Khẩu 口\n• 国 (guó): Quốc = Vi 囗 + Ngọc 玉",
     "story": "Đâm trúng Trung tâm và dùng thành bao bọc Ngọc quý của một Quốc gia.",
     "example_cn": "我喜欢中国菜。",
     "example_pinyin": "Wǒ xǐhuan Zhōngguó cài.",
@@ -905,19 +922,20 @@ Trả về DUY NHẤT một mảng JSON thuần túy (không bọc trong markdow
         "hanzi": "忠",
         "pinyin": "zhōng",
         "hanviet": "Trung",
-        "meaning_vi": "Trung thành, lòng trung (đồng âm 中)",
+        "meaning_vi": "Trung thành, lòng trung",
         "tag": "Đọc giống"
-      },
-      {
-        "hanzi": "图",
-        "pinyin": "tú",
-        "hanviet": "Đồ",
-        "meaning_vi": "Bản đồ, hình vẽ (khung Vi 囗 viết giống 国)",
-        "tag": "Viết giống"
       }
     ]
   }
-]`;
+]
+
+KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ:
+- Kết quả cuối cùng phải parse được bằng JSON.parse().
+- Chỉ có 1 root JSON duy nhất.
+- Root bắt buộc là Array.
+- Không có bất kỳ ký tự hay nội dung nào nằm ngoài Array.
+
+Hãy tuân thủ tuyệt đối các quy tắc trên.`
 
     // PROMPT TẠO ĐỀ HSK 3.0 — thiết kế cho JSON có cấu trúc và kiểm tra tự động
     const EXAM_SYSTEM_PROMPT = `Bạn là Trưởng ban Đề thi thuộc Trung tâm Hợp tác Giao lưu Ngôn ngữ và Giáo dục (CLEC), chuyên gia biên soạn đề thi Hán ngữ Quốc tế HSK 3.0 (Cấp độ 1-9).
@@ -2536,6 +2554,122 @@ QUY TẮC BẮT BUỘC:
       if(first>=0&&last>first) s=s.slice(first,last+1);
       return s;
     }
+
+    // Parser JSON an toàn dành cho các response dạng Array từ Gemini.
+    // Hỗ trợ JSON chuẩn, markdown code fence, object đơn, nhiều object
+    // nối tiếp ({...}{...}) và luôn trả về Array an toàn.
+    function safeParseGeminiJSON(rawText) {
+      const safe = [];
+
+      try {
+        let text = String(rawText ?? '')
+          .replace(/^\uFEFF/, '')
+          .trim();
+
+        if (!text) return [];
+
+        // Loại markdown code fence: ```json ... ``` hoặc ``` ... ```
+        text = text
+          .replace(/```json/gi, '')
+          .replace(/```/g, '')
+          .trim();
+
+        // 1) Ưu tiên parse trực tiếp response chuẩn.
+        try {
+          const direct = JSON.parse(text);
+
+          if (Array.isArray(direct)) return direct;
+          if (direct && typeof direct === 'object') return [direct];
+        } catch (_) {
+          // Tiếp tục phục hồi bên dưới.
+        }
+
+        // Tách một JSON value hoàn chỉnh bắt đầu bằng { hoặc [.
+        function extractJSONValue(source, startIndex) {
+          const firstChar = source[startIndex];
+          if (firstChar !== '{' && firstChar !== '[') return null;
+
+          const stack = [];
+          let inString = false;
+          let escaped = false;
+
+          for (let i = startIndex; i < source.length; i++) {
+            const ch = source[i];
+
+            if (inString) {
+              if (escaped) {
+                escaped = false;
+                continue;
+              }
+              if (ch === '\\') {
+                escaped = true;
+                continue;
+              }
+              if (ch === '"') inString = false;
+              continue;
+            }
+
+            if (ch === '"') {
+              inString = true;
+              continue;
+            }
+
+            if (ch === '{' || ch === '[') {
+              stack.push(ch);
+              continue;
+            }
+
+            if (ch === '}' || ch === ']') {
+              if (!stack.length) return null;
+              const expected = ch === '}' ? '{' : '[';
+              if (stack[stack.length - 1] !== expected) return null;
+
+              stack.pop();
+              if (stack.length === 0) {
+                return source.slice(startIndex, i + 1);
+              }
+            }
+          }
+
+          return null;
+        }
+
+        // 2) Quét toàn bộ response để phục hồi các root JSON nối tiếp nhau.
+        let i = 0;
+        while (i < text.length) {
+          const ch = text[i];
+
+          if (ch !== '{' && ch !== '[') {
+            i++;
+            continue;
+          }
+
+          const chunk = extractJSONValue(text, i);
+          if (!chunk) {
+            i++;
+            continue;
+          }
+
+          try {
+            const value = JSON.parse(chunk);
+            if (Array.isArray(value)) {
+              safe.push(...value);
+            } else if (value && typeof value === 'object') {
+              safe.push(value);
+            }
+          } catch (err) {
+            console.warn('safeParseGeminiJSON: bỏ qua JSON fragment lỗi', err);
+          }
+
+          i += chunk.length;
+        }
+
+        return safe;
+      } catch (err) {
+        console.error('safeParseGeminiJSON failed:', err, rawText);
+        return [];
+      }
+    }
     function examQuestionTotal(data){
       return (data?.sections||[]).reduce((sum,sec)=>sum+(sec?.parts||[]).reduce((s,p)=>s+(Array.isArray(p?.questions)?p.questions.length:0),0),0);
     }
@@ -2952,9 +3086,93 @@ ${vocabList}`;
     }
 
     /* ================= PHÂN TÍCH TỪ VỰNG ================= */
-    async function analyzeVocab(){
-      haptic();if(!hasGeminiApiKeys()){alert('Vui lòng cài đặt Gemini API Key tại tab Cài đặt!');switchTab('settings');return;}const input=document.getElementById('vocabInput').value.trim();if(!input)return alert('Hãy nhập ít nhất một từ vựng!');const btn=document.getElementById('analyzeBtn');const banner=document.getElementById('failoverBanner');const bannerText=document.getElementById('failoverText');btn.disabled=true;
-      try{const {data,model,keyIndex}=await runGeminiWithKeyPool({models:MODEL_FALLBACK_CHAIN,bodyFactory:()=>({contents:[{parts:[{text:SYSTEM_PROMPT},{text:`Từ vựng:\n${input}`}]}],generationConfig:{responseMimeType:'application/json'}}),onAttempt:({model,keyIndex,keyCount})=>{document.getElementById('headerModelBadge').innerText=model;btn.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}...`;}});const raw=data?.candidates?.[0]?.content?.parts?.find(p=>typeof p?.text==='string')?.text;if(!raw)throw new Error('Gemini không trả về JSON');const parsed=JSON.parse(cleanJSONText(raw));stagingData=Array.isArray(parsed)?parsed:[parsed];renderStagingCards();banner?.classList.add('hidden');console.info(`Analyze dùng ${model}, API ${keyIndex+1}`);}catch(e){if(banner){banner.classList.remove('hidden');if(bannerText)bannerText.innerText=e?.message||String(e);}alert(`Lỗi phân tích: ${e?.message||e}`);}finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> AI Tách Bộ, Ghép Truyện & Phân Biệt Từ';}
+    async function analyzeVocab() {
+      haptic();
+
+      if (!hasGeminiApiKeys()) {
+        alert('Vui lòng cài đặt Gemini API Key tại tab Cài đặt!');
+        switchTab('settings');
+        return;
+      }
+
+      const input = document.getElementById('vocabInput').value.trim();
+      if (!input) {
+        alert('Hãy nhập ít nhất một từ vựng!');
+        return;
+      }
+
+      const btn = document.getElementById('analyzeBtn');
+      const banner = document.getElementById('failoverBanner');
+      const bannerText = document.getElementById('failoverText');
+      btn.disabled = true;
+
+      try {
+        const { data, model, keyIndex } = await runGeminiWithKeyPool({
+          models: MODEL_FALLBACK_CHAIN,
+
+          bodyFactory: () => ({
+            contents: [
+              {
+                parts: [
+                  { text: SYSTEM_PROMPT },
+                  {
+                    text: `DANH SÁCH TỪ VỰNG NGƯỜI DÙNG:\n${input}\n\nHãy phân tích toàn bộ danh sách trên và trả về đúng 1 JSON Array duy nhất. Mỗi từ đầu vào phải tương ứng với đúng 1 object trong Array.`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.2
+            }
+          }),
+
+          onAttempt: ({ model, keyIndex, keyCount }) => {
+            document.getElementById('headerModelBadge').innerText = model;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex + 1}/${keyCount}...`;
+          }
+        });
+
+        const raw = data?.candidates?.[0]?.content?.parts
+          ?.find(p => typeof p?.text === 'string')
+          ?.text;
+
+        if (!raw) {
+          throw new Error(data?.error?.message || 'Gemini không trả về JSON.');
+        }
+
+        console.log('Gemini raw response:', raw);
+
+        const parsed = safeParseGeminiJSON(raw);
+
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          throw new Error('Gemini trả về dữ liệu nhưng không thể chuyển thành JSON Array hợp lệ.');
+        }
+
+        stagingData = parsed.filter(
+          item => item && typeof item === 'object' && !Array.isArray(item)
+        );
+
+        if (!stagingData.length) {
+          throw new Error('Không có dữ liệu từ vựng hợp lệ để hiển thị.');
+        }
+
+        renderStagingCards();
+        banner?.classList.add('hidden');
+
+        console.info(`Analyze dùng ${model}, API ${keyIndex + 1}, nhận ${stagingData.length} từ`);
+      } catch (e) {
+        if (banner) {
+          banner.classList.remove('hidden');
+          if (bannerText) bannerText.innerText = e?.message || String(e);
+        }
+
+        console.error('analyzeVocab error:', e);
+        alert(`Lỗi phân tích: ${e?.message || e}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> AI Tách Bộ, Ghép Truyện & Phân Biệt Từ';
+      }
     }
     function renderStagingCards() {
       const container = document.getElementById('stagingCards');
