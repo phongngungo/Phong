@@ -206,7 +206,7 @@
           <i class="fa-solid fa-shield-halved text-red-600"></i> Chuỗi Auto-Fallback khi hết Quota:
         </div>
         <p class="text-[10px] text-stone-600 leading-relaxed font-mono">
-          3.6 Flash → 3.7 Flash → 3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 2.5 Flash Lite
+          3.6 Flash → 3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 2.5 Flash Lite
         </p>
       </div>
 
@@ -1100,7 +1100,6 @@ SCHEMA PHẢI TUÂN THỦ:
     }
 
     const MODEL_FALLBACK_CHAIN = [
-      'gemini-3.7-flash',
       'gemini-3.6-flash',
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
@@ -1128,7 +1127,6 @@ QUY TẮC BẮT BUỘC:
 ]`;
 
     const COMMUNICATION_MODEL_FALLBACK_CHAIN = [
-      'gemini-3.7-flash',
       'gemini-3.6-flash',
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
@@ -2956,7 +2954,7 @@ ${vocabList}`;
     /* ================= PHÂN TÍCH TỪ VỰNG ================= */
     async function analyzeVocab(){
       haptic();if(!hasGeminiApiKeys()){alert('Vui lòng cài đặt Gemini API Key tại tab Cài đặt!');switchTab('settings');return;}const input=document.getElementById('vocabInput').value.trim();if(!input)return alert('Hãy nhập ít nhất một từ vựng!');const btn=document.getElementById('analyzeBtn');const banner=document.getElementById('failoverBanner');const bannerText=document.getElementById('failoverText');btn.disabled=true;
-      try{const {data,model,keyIndex}=await runGeminiWithKeyPool({models:MODEL_FALLBACK_CHAIN,bodyFactory:()=>({contents:[{parts:[{text:SYSTEM_PROMPT},{text:`Từ vựng:\n${input}`}]}],generationConfig:{responseMimeType:'application/json'}}),onAttempt:({model,keyIndex,keyCount})=>{document.getElementById('headerModelBadge').innerText=model;btn.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}...`;}});const raw=data?.candidates?.[0]?.content?.parts?.find(p=>typeof p?.text==='string')?.text;if(!raw)throw new Error('Gemini không trả về JSON');stagingData=JSON.parse(cleanJSONText(raw));renderStagingCards();banner?.classList.add('hidden');console.info(`Analyze dùng ${model}, API ${keyIndex+1}`);}catch(e){if(banner){banner.classList.remove('hidden');if(bannerText)bannerText.innerText=e?.message||String(e);}alert(`Lỗi phân tích: ${e?.message||e}`);}finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> AI Tách Bộ, Ghép Truyện & Phân Biệt Từ';}
+      try{const {data,model,keyIndex}=await runGeminiWithKeyPool({models:MODEL_FALLBACK_CHAIN,bodyFactory:()=>({contents:[{parts:[{text:SYSTEM_PROMPT},{text:`Từ vựng:\n${input}`}]}],generationConfig:{responseMimeType:'application/json'}}),onAttempt:({model,keyIndex,keyCount})=>{document.getElementById('headerModelBadge').innerText=model;btn.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}...`;}});const raw=data?.candidates?.[0]?.content?.parts?.find(p=>typeof p?.text==='string')?.text;if(!raw)throw new Error('Gemini không trả về JSON');const parsed=JSON.parse(cleanJSONText(raw));stagingData=Array.isArray(parsed)?parsed:[parsed];renderStagingCards();banner?.classList.add('hidden');console.info(`Analyze dùng ${model}, API ${keyIndex+1}`);}catch(e){if(banner){banner.classList.remove('hidden');if(bannerText)bannerText.innerText=e?.message||String(e);}alert(`Lỗi phân tích: ${e?.message||e}`);}finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> AI Tách Bộ, Ghép Truyện & Phân Biệt Từ';}
     }
     function renderStagingCards() {
       const container = document.getElementById('stagingCards');
