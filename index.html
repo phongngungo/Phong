@@ -1125,24 +1125,52 @@ SCHEMA PHẢI TUÂN THỦ:
       'gemini-2.5-flash'
     ];
 
-    const COMMUNICATION_SYSTEM_PROMPT = `Bạn là chuyên gia huấn luyện khẩu ngữ Tiếng Trung giao tiếp đời sống thực chiến (HSK 1 - HSK 6).
-Nhiệm vụ của bạn là tiếp nhận danh sách từ vựng người dùng đã học, chọn lọc và ghép nối thành các mẫu câu giao tiếp đời sống thường ngày mang tính ứng dụng cao nhất (gọi món, mua sắm, hỏi đường, giao tiếp công sở, hẹn hò, tán gẫu, xử lý tình huống phát sinh...).
+    const COMMUNICATION_SYSTEM_PROMPT = `Bạn là chuyên gia huấn luyện khẩu ngữ tiếng Trung, chuyên giúp người học ghi nhớ và sử dụng từ vựng trong giao tiếp đời sống thực tế (HSK 1 - HSK 6).
 
-QUY TẮC BẮT BUỘC:
-1. Văn phong khẩu ngữ tự nhiên, sát thực tế đời sống của người bản xứ (ưu tiên kết cấu tự nhiên: 把, 被, 既然...就, 顺便, 要不是, 到底...).
-2. Ghép 2 - 4 từ vựng mục tiêu vào 1 câu hợp lý, không gượng ép.
-3. Trả về DUY NHẤT một JSON Array thuần túy (tuyệt đối không bọc trong markdown hoặc giải thích thêm):
+NHIỆM VỤ:
+Dựa vào danh sách từ vựng tiếng Trung người học cung cấp, hãy ghép chúng thành các câu giao tiếp THỰC TẾ, TỰ NHIÊN, DỄ HIỂU và DỄ HỌC. Ưu tiên những câu mà người bản xứ thực sự thường nói trong đời sống hằng ngày, tuyệt đối tránh những câu văn vẻ, học thuật, kỳ lạ hoặc ít gặp chỉ để cố nhét từ vựng.
+
+NGUYÊN TẮC QUAN TRỌNG NHẤT:
+1. Ưu tiên khẩu ngữ thông dụng, câu ngắn-vừa, tự nhiên và có tính ứng dụng cao.
+2. Ưu tiên các tình huống người học dễ gặp: Chào hỏi, Giới thiệu bản thân, Trường học, Công việc, Gia đình, Ăn uống, Mua sắm, Đi lại/Hỏi đường, Thời gian/Lịch hẹn, Sinh hoạt hằng ngày, Gọi điện/Nhắn tin, Bạn bè/Giao tiếp xã hội, Du lịch, Sức khỏe cơ bản.
+3. Không cố dùng từ mục tiêu nếu việc đưa từ đó vào khiến câu gượng ép. Thà dùng ít từ mục tiêu nhưng câu thật tự nhiên còn hơn nhồi nhiều từ.
+4. Mỗi câu nên kết hợp khéo léo nhiều từ vựng mục tiêu khi có thể (thường 2-4 từ), nhưng tính tự nhiên luôn được ưu tiên cao hơn số lượng từ.
+5. Ưu tiên mẫu câu và cấu trúc người học có thể tái sử dụng nhiều lần trong đời sống như: 你叫什么名字？、你住在哪里？、你有没有时间？、我想……、我觉得……、可以……吗？、要不要……？、怎么……？、为什么……？、因为……所以……、如果……就……、已经……了、正在……、一起……、先……再…… 等 khi phù hợp trình độ.
+6. Không tạo tình huống quá đặc biệt, quá kịch tính, quá văn chương, thành ngữ khó hoặc cách nói hiếm gặp nếu không thực sự cần thiết.
+7. Độ khó phải phù hợp trình độ của từ vựng. Với từ HSK thấp, câu phải đơn giản; không dùng hàng loạt từ ngoài danh sách ở mức cao làm câu khó học.
+8. Khi ghép nhiều từ, phải tạo thành một câu hoàn chỉnh có ngữ cảnh rõ ràng, giống câu người học có thể lập tức đem ra nói.
+9. Phân loại từng câu theo một chủ đề/ngữ cảnh đời sống rõ ràng.
+10. Nếu một từ có nhiều cách dùng, ưu tiên cách dùng phổ biến nhất trong giao tiếp hằng ngày.
+
+ĐỊNH DẠNG NỘI DUNG MỖI CÂU:
+- Chữ Hán: câu tiếng Trung Giản thể, trình bày nổi bật/in đậm ở giao diện.
+- Pinyin: phiên âm Hanyu Pinyin có dấu thanh chuẩn.
+- Dịch nghĩa: tiếng Việt tự nhiên, dễ hiểu, không dịch word-by-word.
+- Từ vựng mục tiêu: ghi rõ các từ trong danh sách đã được lồng ghép, theo dạng “Từ vựng: …”.
+
+YÊU CẦU ĐẦU RA CHO APP:
+Ứng dụng hiện đang xử lý kết quả bằng JSON, vì vậy KHÔNG được trả về markdown/bullet hay văn bản ngoài JSON. Hãy trả về DUY NHẤT một JSON Array hợp lệ, mỗi object là một câu giao tiếp, với schema:
 [
   {
-    "scenario": "Tên tình huống",
-    "hanzi": "Câu tiếng Trung hoàn chỉnh",
-    "pinyin": "Pinyin có dấu thanh chuẩn xác",
-    "meaning_vi": "Nghĩa tiếng Việt tự nhiên",
-    "target_words_used": ["từ_đã_dùng_1", "từ_đã_dùng_2"],
-    "practical_tip": "Mẹo ngữ điệu hoặc biến thể rút gọn thường dùng ngoài đời",
-    "grammar_note": "Cấu trúc ngữ pháp đáng chú ý và cách dùng; nếu không có cấu trúc nổi bật thì ghi dấu gạch ngang —"
+    "scenario": "Chủ đề/ngữ cảnh đời sống, ví dụ: Ăn uống / Mua sắm / Trường học",
+    "hanzi": "Câu tiếng Trung Giản thể tự nhiên, thông dụng",
+    "pinyin": "Pinyin có dấu thanh chuẩn",
+    "meaning_vi": "Dịch nghĩa tiếng Việt tự nhiên",
+    "target_words_used": ["từ mục tiêu 1", "từ mục tiêu 2"],
+    "practical_tip": "Mẹo dùng câu trong giao tiếp; ngắn gọn, thiết thực. Nếu không cần thì ghi —",
+    "grammar_note": "Chú thích cấu trúc đáng nhớ; chỉ ghi cấu trúc thực sự hữu ích. Nếu không có thì ghi —"
   }
-]`;
+]
+
+KIỂM TRA TRƯỚC KHI TRẢ:
+- Đúng số lượng câu được yêu cầu.
+- Mỗi câu phải là một câu giao tiếp hoàn chỉnh, tự nhiên và dễ học.
+- Không có câu kỳ lạ chỉ vì cố sử dụng từ mục tiêu.
+- Pinyin chính xác.
+- Dịch tiếng Việt tự nhiên.
+- scenario phải phản ánh đúng ngữ cảnh câu.
+- target_words_used chỉ chứa những từ thực sự xuất hiện trong câu.
+- Không có markdown, không có lời giải thích ngoài JSON.`;
 
     const COMMUNICATION_MODEL_FALLBACK_CHAIN = [
       'gemini-3.6-flash',
@@ -1165,6 +1193,10 @@ QUY TẮC BẮT BUỘC:
     let currentExamData = null;
     let examTimerInterval = null;
     let remainingExamSeconds = 1200;
+    let examSubmitting = false;
+    let restoredExamRemaining = null;
+    const EXAM_DRAFT_KEY = 'hn_hsk_exam_draft_v3';
+    const EXAM_RESULT_KEY = 'hn_hsk_exam_result_v3';
 
     // ================= HSKK STATE =================
     const HSKK_BEGINNER_BANK = {
@@ -1226,7 +1258,7 @@ QUY TẮC BẮT BUỘC:
       haptic();if(!hasGeminiApiKeys()){alert('Vui lòng thêm ít nhất 1 Gemini API Key tại tab Cài đặt.');switchTab('settings');return;}
       const source=currentFilter==='ALL'?vocabStore:vocabStore.filter(v=>v.category===currentFilter);if(!source.length){alert('Kho từ vựng hiện tại đang trống.');return;}
       const picked=shuffleArray(source).slice(0,18).map(v=>({hanzi:v.hanzi,pinyin:v.pinyin,meaning:v.hanviet_meaning||v.example_vi||'',category:v.category||''}));
-      const prompt=`Hãy tạo đúng 5 mẫu câu giao tiếp thực chiến dựa trên danh sách từ vựng sau. Mỗi câu cố gắng dùng 2-4 từ mục tiêu. Nếu có cấu trúc 把, 被, 既然...就, 顺便, 要不是, 到底... thì ghi rõ grammar_note.\n\nDANH SÁCH TỪ VỰNG:\n${JSON.stringify(picked,null,2)}`;
+      const prompt=`Dựa vào danh sách từ vựng dưới đây, hãy tạo đúng 5 câu giao tiếp thực tế, tự nhiên và dễ học. Ưu tiên các tình huống đời sống quen thuộc như chào hỏi, trường học, công việc, gia đình, ăn uống, mua sắm, đi lại, thời gian, sinh hoạt hằng ngày và giao tiếp với bạn bè. Không tạo câu lạ, văn vẻ, học thuật hoặc gượng ép chỉ để nhồi từ. Mỗi câu nên dùng khoảng 2-4 từ mục tiêu khi có thể, nhưng tự nhiên quan trọng hơn số lượng. Phân loại câu theo chủ đề/ngữ cảnh. Pinyin phải có dấu chuẩn, nghĩa tiếng Việt phải tự nhiên, và target_words_used chỉ ghi các từ thực sự xuất hiện trong câu.\n\nDAN SÁCH TỪ VỰNG:\n${JSON.stringify(picked,null,2)}`;
       const buttons=[document.getElementById('communicationGenerateBtn'),document.getElementById('communicationGenerateBtnMain')].filter(Boolean);buttons.forEach(b=>{b.disabled=true;b.dataset.oldHtml=b.innerHTML;});
       try{const {data,model,keyIndex}=await runGeminiWithKeyPool({models:COMMUNICATION_MODEL_FALLBACK_CHAIN,bodyFactory:()=>({contents:[{parts:[{text:COMMUNICATION_SYSTEM_PROMPT},{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.8}}),onAttempt:({model,keyIndex,keyCount})=>buttons.forEach(b=>b.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}`)});const raw=data?.candidates?.[0]?.content?.parts?.find(x=>typeof x?.text==='string')?.text;if(!raw)throw new Error(data?.error?.message||'AI không trả về dữ liệu câu giao tiếp.');const arr=parseCommunicationJSON(raw);if(!Array.isArray(arr)||!arr.length)throw new Error('Kết quả AI không phải JSON Array hợp lệ.');communicationGenerated=arr.slice(0,5).map(x=>({scenario:String(x?.scenario||'Giao tiếp đời sống'),hanzi:String(x?.hanzi||'').trim(),pinyin:String(x?.pinyin||'').trim(),meaning_vi:String(x?.meaning_vi||'').trim(),target_words_used:Array.isArray(x?.target_words_used)?x.target_words_used.map(String).slice(0,6):[],practical_tip:String(x?.practical_tip||'').trim(),grammar_note:String(x?.grammar_note||'—').trim()||'—'})).filter(x=>x.hanzi);if(!communicationGenerated.length)throw new Error('AI không tạo được câu hợp lệ.');renderCommunicationGenerated();openCommunicationModal();console.info(`Communication dùng ${model}, API ${keyIndex+1}`);}catch(e){alert(`Không thể tạo mẫu câu giao tiếp.\nChi tiết: ${e?.message||e}`);}finally{buttons.forEach(b=>{b.disabled=false;b.innerHTML=b.dataset.oldHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i> Tạo 5 câu giao tiếp';});}
     }
@@ -1244,6 +1276,19 @@ QUY TẮC BẮT BUỘC:
     const PRACTICE_STORE_KEY = 'hn_practice_history_v2';
     let learningErrors = JSON.parse(localStorage.getItem(ERROR_STORE_KEY) || '[]');
     let practiceHistory = JSON.parse(localStorage.getItem(PRACTICE_STORE_KEY) || '[]');
+    // ================= HSK EXAM PERSISTENCE =================
+    function safeExamStorageSet(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true;}catch(e){console.warn('Không thể lưu dữ liệu thi HSK:',e);return false;}}
+    function safeExamStorageGet(key){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):null;}catch(e){console.warn('Dữ liệu thi HSK bị lỗi:',e);return null;}}
+    function captureExamAnswers(){const root=document.getElementById('examActiveContainer');if(!root)return{};const answers={};root.querySelectorAll('input').forEach(el=>{const key=el.id||el.name;if(!key)return;if(el.type==='radio'||el.type==='checkbox'){if(el.checked)answers[key]={value:el.value,checked:true,name:el.name,type:el.type};}else answers[key]={value:el.value,checked:el.checked,name:el.name,type:el.type};});return answers;}
+    function restoreExamAnswers(answers){if(!answers||typeof answers!=='object')return;const root=document.getElementById('examActiveContainer');if(!root)return;Object.entries(answers).forEach(([key,a])=>{let el=null;try{el=root.querySelector('#'+CSS.escape(key));}catch(_){}if(!el&&a?.name){try{el=root.querySelector(`input[name="${CSS.escape(a.name)}"][value="${CSS.escape(String(a.value??''))}"]`);}catch(_){} }if(!el)return;if(el.type==='radio'||el.type==='checkbox')el.checked=!!a.checked;else el.value=String(a.value??'');});}
+    function saveActiveExamDraft(){const root=document.getElementById('examActiveContainer');if(!currentExamData||!root||root.classList.contains('hidden'))return;const level=document.getElementById('examLevelSelect')?.value||currentExamData?.exam_metadata?.hsk_level||'HSK 3';safeExamStorageSet(EXAM_DRAFT_KEY,{version:3,level,skill:currentExamSkill,questionCount:currentExamQuestionCount,remainingSeconds:Math.max(0,Number(remainingExamSeconds)||0),examData:currentExamData,answers:captureExamAnswers(),savedAt:Date.now()});}
+    function clearActiveExamDraft(){try{localStorage.removeItem(EXAM_DRAFT_KEY);}catch(_){} }
+    function saveExamResultState(state){safeExamStorageSet(EXAM_RESULT_KEY,{version:1,...state,savedAt:Date.now()});}
+    function clearExamResultState(){try{localStorage.removeItem(EXAM_RESULT_KEY);}catch(_){} }
+    function recordLearningError(type,prompt,answer,explanation='',extra={}){try{const key=`${String(type||'')}|${String(prompt||'')}|${String(answer||'')}`;const idx=learningErrors.findIndex(e=>e.key===key);if(idx>=0){const old=learningErrors[idx];old.count=(Number(old.count)||1)+1;old.lastSeen=new Date().toISOString();old.explanation=String(explanation||old.explanation||'');Object.assign(old,extra);learningErrors.splice(idx,1);learningErrors.unshift(old);}else learningErrors.unshift({key,type:String(type||''),prompt:String(prompt||''),answer:String(answer||''),explanation:String(explanation||''),count:1,lastSeen:new Date().toISOString(),...extra});learningErrors=learningErrors.slice(0,300);localStorage.setItem(ERROR_STORE_KEY,JSON.stringify(learningErrors));}catch(e){console.warn('recordLearningError failed:',e);}}
+    function recordPracticeEvent(event={}){try{practiceHistory.push({id:Date.now()+Math.random().toString(36).slice(2,7),at:new Date().toISOString(),...event});practiceHistory=practiceHistory.slice(-200);localStorage.setItem(PRACTICE_STORE_KEY,JSON.stringify(practiceHistory));}catch(e){console.warn('recordPracticeEvent failed:',e);}}
+    function restoreSavedExamState(){const result=safeExamStorageGet(EXAM_RESULT_KEY);if(result?.completed&&result.reviewHtml){currentExamSkill=result.skill||'Full_Mock';currentExamQuestionCount=Number(result.questionCount)||0;document.getElementById('examConfigCard')?.classList.add('hidden');document.getElementById('examActiveContainer')?.classList.add('hidden');document.getElementById('examResultContainer')?.classList.remove('hidden');if(document.getElementById('resultListeningScore'))document.getElementById('resultListeningScore').innerText=result.scoreL==null?'—':`${result.scoreL}/100`;if(document.getElementById('resultReadingScore'))document.getElementById('resultReadingScore').innerText=result.scoreR==null?'—':`${result.scoreR}/100`;if(document.getElementById('resultWritingScore'))document.getElementById('resultWritingScore').innerText=result.scoreW==null?'—':`${result.scoreW}/100`;if(document.getElementById('resultTotalScore'))document.getElementById('resultTotalScore').innerHTML=`${result.displayOverall} <span class="text-xs text-stone-400 font-normal font-sans">/ ${result.skill==='Full_Mock'?300:100} điểm</span>`;const pass=document.getElementById('resultPassBadge');if(pass){pass.className=`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${result.good?'bg-emerald-100 text-emerald-800':'bg-rose-100 text-rose-800'}`;pass.innerText=result.good?'ĐẠT MỨC MÔ PHỎNG':'CHƯA ĐẠT MỨC MÔ PHỎNG';}document.getElementById('examReviewList').innerHTML=result.reviewHtml;updateDictionaryMode();return true;}const draft=safeExamStorageGet(EXAM_DRAFT_KEY);if(draft?.examData&&typeof draft.examData==='object'){currentExamData=normalizeExamData(draft.examData);currentExamSkill=draft.skill||'Full_Mock';currentExamQuestionCount=Number(draft.questionCount)||examQuestionTotal(currentExamData);restoredExamRemaining=Number(draft.remainingSeconds);if(!Number.isFinite(restoredExamRemaining)||restoredExamRemaining<=0)restoredExamRemaining=null;const level=draft.level||currentExamData?.exam_metadata?.hsk_level||'HSK 3';renderActiveExamUI(level);restoreExamAnswers(draft.answers);saveActiveExamDraft();return true;}return false;}
+
     async function runAICoach(){
       if(!hasGeminiApiKeys()){alert('Vui lòng thêm Gemini API Key trong Cài đặt.');switchTab('settings');return;}const btn=document.getElementById('coachBtn');const out=document.getElementById('coachOutput');btn.disabled=true;
       const errors=learningErrors.slice(0,20).map(e=>({type:e.type,prompt:e.prompt,answer:e.answer,count:e.count,score:e.score}));const hist=practiceHistory.slice(-30);const vocab=vocabStore.slice(0,50).map(v=>({hanzi:v.hanzi,pinyin:v.pinyin,meaning:v.hanviet_meaning,category:v.category}));const prompt=`Bạn là AI Coach học tiếng Trung cá nhân. Phân tích dữ liệu sau và trả DUY NHẤT JSON: {"summary":"...","priority":["..."],"today":["...","...","..."],"reason":"...","encouragement":"..."}. Lỗi: ${JSON.stringify(errors)} Lịch sử: ${JSON.stringify(hist)} Kho từ: ${JSON.stringify(vocab)}`;
@@ -1409,8 +1454,8 @@ QUY TẮC BẮT BUỘC:
     let currentCharIndex = 0;
     let strokePoints = [];
     const BRUSH_COLOR = "#0c0d12";
-    const MIN_WIDTH = 3.2;
-    const MAX_WIDTH = 26.0;
+    const MIN_WIDTH = 1.6;
+    const MAX_WIDTH = 13.0;
 
     let availableVoices = [];
     const TTS_VOICE_KEY = "hn_tts_voice_name_v2";
@@ -1965,13 +2010,13 @@ QUY TẮC BẮT BUỘC:
         .replace(/'/g, '&apos;');
     }
 
-    async function speakWithAzureXiaoyi(text) {
+    async function speakWithAzureXiaoyi(text, options = {}) {
       const cleanText = normalizeSpeechText(text);
       const { key, region } = getAzureSpeechConfig();
       if (!cleanText || !key || !region) return false;
 
       const endpoint = `https://${encodeURIComponent(region)}.tts.speech.microsoft.com/cognitiveservices/v1`;
-      const ssml = `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}"><prosody rate="0%" pitch="0%">${escapeXmlForSsml(cleanText)}</prosody></voice></speak>`;
+      const ssml = `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${Math.round(((options.rate ?? 0.72) - 1) * 100)}%" pitch="0%">${escapeXmlForSsml(cleanText)}</prosody></voice></speak>`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -2076,7 +2121,7 @@ QUY TẮC BẮT BUỘC:
       ];
     }
 
-    function playRemoteChineseTTS(text, requestId) {
+    function playRemoteChineseTTS(text, requestId, options = {}) {
       return new Promise((resolve, reject) => {
         const urls = buildRemoteChineseTTSUrls(text);
         let index = 0;
@@ -2091,6 +2136,8 @@ QUY TẮC BẮT BUỘC:
             activeTtsAudio = audio;
             audio.preload = 'auto';
             audio.volume = 1;
+            audio.playbackRate = Number(options.rate ?? 0.72);
+            audio.defaultPlaybackRate = Number(options.rate ?? 0.72);
             audio.playsInline = true;
             audio.setAttribute('playsinline', '');
             audio.onended = () => {
@@ -2135,7 +2182,7 @@ QUY TẮC BẮT BUỘC:
       });
     }
 
-    function speakWithSystemTTS(text) {
+    function speakWithSystemTTS(text, options = {}) {
       if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return Promise.resolve(false);
       return waitForSpeechVoices().then(() => new Promise(resolve => {
         let started = false;
@@ -2151,7 +2198,7 @@ QUY TẮC BẮT BUỘC:
         if (voice) utterance.voice = voice;
         utterance.lang = voice?.lang || 'zh-CN';
         utterance.pitch = 1.08;
-        utterance.rate = 0.88;
+        utterance.rate = Number(options.rate ?? 0.72);
         utterance.volume = 1.0;
         utterance.onstart = () => { started = true; };
         utterance.onend = () => finish(started);
@@ -2170,7 +2217,12 @@ QUY TẮC BẮT BUỘC:
       }));
     }
 
-    async function speakHanzi(text) {
+    // Giọng riêng cho phần Listening của đề thi: chậm, rõ, dễ bắt âm hơn nhưng không làm chậm toàn bộ app.
+    function speakListening(text) {
+      return speakHanzi(text, { rate: 0.68, listening: true });
+    }
+
+    async function speakHanzi(text, options = {}) {
       haptic();
       const cleanText = normalizeSpeechText(text);
       if (!cleanText) return;
@@ -2181,7 +2233,7 @@ QUY TẮC BẮT BUỘC:
 
       // 1) Microsoft Azure Neural TTS — ưu tiên zh-CN-XiaoyiNeural.
       try {
-        if (await speakWithAzureXiaoyi(cleanText)) return;
+        if (await speakWithAzureXiaoyi(cleanText, options)) return;
       } catch (e) {
         ttsLastError = e;
         console.warn('Azure XiaoyiNeural unavailable, falling back:', e);
@@ -2189,7 +2241,7 @@ QUY TẮC BẮT BUỘC:
 
       // 2) Android/browser native TTS fallback.
       try {
-        if (await speakWithSystemTTS(cleanText)) return;
+        if (await speakWithSystemTTS(cleanText, options)) return;
       } catch (e) {
         ttsLastError = e;
         console.warn('System TTS unavailable:', e);
@@ -2197,7 +2249,7 @@ QUY TẮC BẮT BUỘC:
 
       // 3) Remote MP3 fallback for devices/WebViews without a Chinese TTS engine.
       try {
-        await playRemoteChineseTTS(cleanText, requestId);
+        await playRemoteChineseTTS(cleanText, requestId, options);
         return;
       } catch (remoteErr) {
         console.warn('Remote Chinese TTS unavailable:', remoteErr);
@@ -2774,10 +2826,39 @@ Tạo đề mô phỏng HSK 3.0 giống đề thi thật nhất có thể cho ${
 - Phân bổ: ${sectionPlan}
 - HSK 1-2 không có Writing; HSK 3-6 có Writing theo cấu trúc chính thức.
 
-YÊU CẦU: phân bố dạng bài, độ dài, độ khó, distractor, ngữ pháp, Pinyin và audio_script phù hợp cấp độ; không tạo câu hỏi mơ hồ; đáp án phải xác định; lồng ghép tự nhiên vốn từ người học nhưng không làm mất tính chuẩn hóa. Trả về DUY NHẤT JSON object theo schema hiện có, không markdown.
+YÊU CẦU: phân bố dạng bài, độ dài, độ khó, distractor, ngữ pháp, Pinyin và audio_script phù hợp cấp độ; không tạo câu hỏi mơ hồ; đáp án phải xác định; lồng ghép tự nhiên vốn từ người học nhưng không làm mất tính chuẩn hóa.
+
+QUY TẮC BẮT BUỘC CHO READING: phải tạo ĐỦ đúng số câu Reading theo phân bổ ở trên. Với MỖI câu reading_comprehension, trường passage phải chứa đoạn văn/câu dẫn hoàn chỉnh và question_text (hoặc question) phải chứa câu hỏi hoàn chỉnh. Không được để passage hoặc question rỗng, không được gộp nhiều câu vào một object, không được bỏ bớt câu để rút ngắn output. Với cloze_test, sentence phải có chỗ trống và correct_answer phải tồn tại trong options/word bank theo schema. Nếu output dài, vẫn ưu tiên đủ số câu hơn phần giải thích dài.
+
+Trả về DUY NHẤT JSON object theo schema hiện có, không markdown.
 
 VỐN TỪ MỤC TIÊU:
 ${vocabList}`;
+    }
+
+    async function repairInvalidExamData(parsedData, level, skill, targetVocab, issues) {
+      const issueText = issues.slice(0, 10).join('; ');
+      const p = getOfficialExamPlan(level, skill);
+      const repairPrompt = `Bạn đang sửa một đề thi HSK 3.0 đã được AI tạo nhưng FAIL kiểm tra dữ liệu.\n\nCấp độ: ${level}\nKỹ năng: ${skill}\nSố câu bắt buộc: ${p.skillTotal}\nPhân bổ bắt buộc: ${skill==='Full_Mock' ? `Listening ${p.listening}[${p.listeningParts.join('+')}], Reading ${p.reading}[${p.readingParts.join('+')}], Writing ${p.writing}[${p.writingParts.join('+')}]` : `${skill} ${p.skillTotal}[${p.skillParts.join('+')}]`}\n\nLỗi kiểm tra: ${issueText}\n\nDỮ LIỆU HIỆN TẠI:\n${JSON.stringify(parsedData)}\n\nHãy SỬA TRỰC TIẾP dữ liệu trên và trả về DUY NHẤT 1 JSON object đúng schema hiện có.\nĐẶC BIỆT: Reading phải đủ đúng ${p.reading} câu nếu skill=${skill}; mọi reading_comprehension phải có passage KHÔNG RỖNG và question_text/question KHÔNG RỖNG; không được xóa các câu hợp lệ. Nếu thiếu passage/question hoặc thiếu câu, hãy TẠO BỔ SUNG nội dung HSK phù hợp dựa trên vốn từ mục tiêu dưới đây.\n\nVỐN TỪ MỤC TIÊU:\n${targetVocab.map(v=>`${v.hanzi} (${v.pinyin||''} - ${v.hanviet_meaning||v.meaning||''})`).join(', ')}`;
+      const {data, model, keyIndex}=await runGeminiWithKeyPool({
+        models: MODEL_FALLBACK_CHAIN,
+        bodyFactory:(activeModel)=>({
+          contents:[{parts:[{text:EXAM_SYSTEM_PROMPT},{text:repairPrompt}]}],
+          generationConfig:{responseMimeType:'application/json',maxOutputTokens:20000,temperature:0.15}
+        }),
+        onAttempt:({model,keyIndex,keyCount})=>{
+          const btn=document.getElementById('generateExamBtn');
+          if(btn) btn.innerHTML=`<i class="fa-solid fa-screwdriver-wrench"></i> Sửa đề · ${model} · API ${keyIndex+1}/${keyCount}...`;
+          const badge=document.getElementById('headerModelBadge'); if(badge) badge.innerText=model;
+        }
+      });
+      const raw=data?.candidates?.[0]?.content?.parts?.find(x=>typeof x?.text==='string')?.text;
+      if(!raw) throw new Error(data?.error?.message||'Model sửa đề không trả về JSON');
+      const fixed=JSON.parse(cleanJSONText(raw));
+      const normalized=normalizeExamData(fixed);
+      const fixedIssues=validateLegacyExam(normalized,skill,p.skillTotal);
+      if(fixedIssues.length) throw new Error(`Sửa đề vẫn chưa đạt: ${fixedIssues.slice(0,4).join('; ')}`);
+      return {normalized,model,keyIndex};
     }
 
     async function generateHSKExam(){
@@ -2787,20 +2868,45 @@ ${vocabList}`;
       if(checked.length===0){alert('Vui lòng chọn ít nhất 1 bài học để tạo đề!');return;}
       const target=vocabStore.filter(v=>checked.includes(v.category));
       if(target.length<3){alert('Cần ít nhất 3 từ vựng đã học để tạo đề.');return;}
-      const level=document.getElementById('examLevelSelect').value;const skill=document.getElementById('examSectionSelect').value;const plan=getOfficialExamPlan(level,skill);const qCount=plan.skillTotal;
+      const level=document.getElementById('examLevelSelect').value;
+      const skill=document.getElementById('examSectionSelect').value;
+      const plan=getOfficialExamPlan(level,skill);
+      const qCount=plan.skillTotal;
       currentExamSkill=skill;currentExamQuestionCount=qCount;updateExamStructureHint();
-      const btn=document.getElementById('generateExamBtn');btn.disabled=true;const userPrompt=makeExamUserPrompt(level,skill,target);
+      const btn=document.getElementById('generateExamBtn');btn.disabled=true;
+      const userPrompt=makeExamUserPrompt(level,skill,target);
+      let lastIssue='';
       try{
-        const {data,model,keyIndex}=await runGeminiWithKeyPool({
-          models:MODEL_FALLBACK_CHAIN,
-          bodyFactory:(activeModel)=>{const generationConfig={responseMimeType:'application/json',maxOutputTokens:20000};if(/^gemini-3\./.test(activeModel))generationConfig.thinkingConfig={thinkingLevel:'medium'};else generationConfig.temperature=0.3;return {contents:[{parts:[{text:EXAM_SYSTEM_PROMPT},{text:userPrompt}]}],generationConfig};},
-          onAttempt:({model,keyIndex,keyCount})=>{btn.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}...`;document.getElementById('headerModelBadge').innerText=model;}
-        });
-        const raw=data?.candidates?.[0]?.content?.parts?.find(p=>typeof p?.text==='string')?.text;
-        if(!raw)throw new Error(data?.error?.message||'Gemini không trả về JSON');
-        const parsed=JSON.parse(cleanJSONText(raw));const normalized=normalizeExamData(parsed);const issues=validateLegacyExam(normalized,skill,qCount);
-        if(issues.length)throw new Error(`Đề chưa đạt kiểm tra: ${issues.slice(0,4).join('; ')}`);
-        currentExamData=normalized;renderActiveExamUI(level);console.info(`Exam dùng ${model}, API ${keyIndex+1}`);
+        let candidate=null;
+        for(let attempt=1; attempt<=3; attempt++){
+          const prompt = attempt===1 ? userPrompt : `${userPrompt}\n\nĐÂY LÀ LẦN SỬA THỨ ${attempt-1}. Output trước đã FAIL kiểm tra với lỗi: ${lastIssue}. Không lặp lại lỗi; phải đủ đúng số câu và đủ passage/question cho Reading.`;
+          const {data,model,keyIndex}=await runGeminiWithKeyPool({
+            models:MODEL_FALLBACK_CHAIN,
+            bodyFactory:(activeModel)=>{const generationConfig={responseMimeType:'application/json',maxOutputTokens:20000};if(/^gemini-3\./.test(activeModel))generationConfig.thinkingConfig={thinkingLevel:'medium'};else generationConfig.temperature=0.2;return {contents:[{parts:[{text:EXAM_SYSTEM_PROMPT},{text:prompt}]}],generationConfig};},
+            onAttempt:({model,keyIndex,keyCount})=>{btn.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}...`;document.getElementById('headerModelBadge').innerText=model;}
+          });
+          const raw=data?.candidates?.[0]?.content?.parts?.find(p=>typeof p?.text==='string')?.text;
+          if(!raw) throw new Error(data?.error?.message||'Gemini không trả về JSON');
+          const parsed=JSON.parse(cleanJSONText(raw));
+          candidate=normalizeExamData(parsed);
+          const issues=validateLegacyExam(candidate,skill,qCount);
+          if(!issues.length){
+            currentExamData=candidate;renderActiveExamUI(level);console.info(`Exam dùng ${model}, API ${keyIndex+1}, attempt ${attempt}`);return;
+          }
+          lastIssue=issues.slice(0,10).join('; ');
+          console.warn(`Exam attempt ${attempt} invalid:`, lastIssue);
+          // Dùng một lượt repair chuyên dụng ngay khi validation fail để AI bổ sung/điền phần còn thiếu.
+          try{
+            const repaired=await repairInvalidExamData(candidate,level,skill,target,issues);
+            currentExamData=repaired.normalized;
+            renderActiveExamUI(level);
+            console.info(`Exam repaired bằng ${repaired.model}, API ${repaired.keyIndex+1}`);
+            return;
+          }catch(repairErr){
+            lastIssue = `${lastIssue}; repair: ${repairErr?.message||repairErr}`;
+          }
+        }
+        throw new Error(`Đề vẫn chưa hợp lệ sau nhiều lần tạo/sửa. ${lastIssue}`);
       }catch(e){alert(`Không thể tạo đề sau khi thử toàn bộ API/model dự phòng.\n\n${e?.message||e}`);}
       finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Tạo Đề Thi HSK 3.0';}
     }
@@ -2820,10 +2926,10 @@ ${vocabList}`;
       document.getElementById('examWritingSection').classList.toggle('hidden',w1.length+w2.length===0);
 
       const l1Container=document.getElementById('listenPart1List');
-      l1Container.innerHTML=l1.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+1}</span><button onclick="speakHanzi('${safeJS(q.audio_text)}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">Nhận định: "${escapeHTML(q.statement||'')}"</p><div class="flex gap-2"><label class="flex-1 flex items-center justify-center gap-1.5 p-2 bg-white rounded-lg border border-stone-200 text-xs font-bold"><input type="radio" name="l1_ans_${idx}" value="true"><span class="text-emerald-700">✓ Đúng</span></label><label class="flex-1 flex items-center justify-center gap-1.5 p-2 bg-white rounded-lg border border-stone-200 text-xs font-bold"><input type="radio" name="l1_ans_${idx}" value="false"><span class="text-rose-700">✗ Sai</span></label></div></div>`).join('');
+      l1Container.innerHTML=l1.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+1}</span><button onclick="speakListening('${safeJS(q.audio_text)}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">Nhận định: "${escapeHTML(q.statement||'')}"</p><div class="flex gap-2"><label class="flex-1 flex items-center justify-center gap-1.5 p-2 bg-white rounded-lg border border-stone-200 text-xs font-bold"><input type="radio" name="l1_ans_${idx}" value="true"><span class="text-emerald-700">✓ Đúng</span></label><label class="flex-1 flex items-center justify-center gap-1.5 p-2 bg-white rounded-lg border border-stone-200 text-xs font-bold"><input type="radio" name="l1_ans_${idx}" value="false"><span class="text-rose-700">✗ Sai</span></label></div></div>`).join('');
 
       const l2Container=document.getElementById('listenPart2List');
-      l2Container.innerHTML=l2.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+l1.length+1}</span><button onclick="speakHanzi('${safeJS(String(q.audio_dialogue||'').replace(/\\n/g,' '))}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">${escapeHTML(q.question||'')}</p><div class="space-y-1.5">${(q.options||[]).map((opt,oi)=>`<label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 text-xs"><input type="radio" name="l2_ans_${idx}" value="${oi}"><span>${escapeHTML(opt)}</span></label>`).join('')}</div></div>`).join('');
+      l2Container.innerHTML=l2.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+l1.length+1}</span><button onclick="speakListening('${safeJS(String(q.audio_dialogue||'').replace(/\\n/g,' '))}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">${escapeHTML(q.question||'')}</p><div class="space-y-1.5">${(q.options||[]).map((opt,oi)=>`<label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 text-xs"><input type="radio" name="l2_ans_${idx}" value="${oi}"><span>${escapeHTML(opt)}</span></label>`).join('')}</div></div>`).join('');
 
       document.getElementById('readingBankContainer').innerHTML=(currentExamData.reading.word_bank||[]).map(w=>`<span class="px-2.5 py-1 bg-white border border-red-200 rounded-lg text-red-900 shadow-sm"><strong>${escapeHTML(w.key||'')}</strong> ${escapeHTML(w.word||'')} <span class="text-[10px] text-stone-400">${escapeHTML(w.pinyin||'')}</span></span>`).join('');
       const r1Container=document.getElementById('readingPart1List');
@@ -2837,53 +2943,32 @@ ${vocabList}`;
       w2Container.innerHTML=w2.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2"><span class="font-bold text-xs text-red-600">Câu ${idx+w1.length+1}</span><div class="p-2 bg-white rounded-lg border border-stone-200 font-hanzi text-xs font-bold">${escapeHTML(q.sentence_with_blank||'')}</div><div class="flex items-center gap-2"><span class="text-xs font-bold">(${escapeHTML(q.pinyin_hint||'')}):</span><input type="text" id="w2_ans_${idx}" class="w-28 text-center bg-white border border-stone-200 rounded-lg p-1.5 text-xs font-hanzi font-bold"></div></div>`).join('');
 
       startExamTimer(); updateDictionaryMode();
+      setTimeout(()=>saveActiveExamDraft(),0);
     }
 
-    function startExamTimer(){
-      clearInterval(examTimerInterval);
-      const baseSeconds=currentExamSkill==='Full_Mock'?Math.max(900,currentExamQuestionCount*45):Math.max(300,currentExamQuestionCount*50);
-      remainingExamSeconds=baseSeconds;
-      const timerEl=document.getElementById('examTimer');
-      const tick=()=>{const m=Math.floor(remainingExamSeconds/60),s=remainingExamSeconds%60;timerEl.innerText=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;};
-      tick();
-      examTimerInterval=setInterval(()=>{remainingExamSeconds--;tick();if(remainingExamSeconds<=0){clearInterval(examTimerInterval);alert('Hết giờ làm bài! Hệ thống sẽ tự động nộp bài.');submitHSKExam();}},1000);
+    function startExamTimer(restoreSeconds=null){
+      clearInterval(examTimerInterval);const baseSeconds=currentExamSkill==='Full_Mock'?Math.max(900,currentExamQuestionCount*45):Math.max(300,currentExamQuestionCount*50);const restored=Number(restoreSeconds??restoredExamRemaining);remainingExamSeconds=(Number.isFinite(restored)&&restored>0)?Math.min(restored,baseSeconds):baseSeconds;restoredExamRemaining=null;const timerEl=document.getElementById('examTimer');const tick=()=>{const total=Math.max(0,remainingExamSeconds),m=Math.floor(total/60),s=total%60;if(timerEl)timerEl.innerText=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;};tick();examTimerInterval=setInterval(()=>{remainingExamSeconds--;tick();if(remainingExamSeconds%3===0)saveActiveExamDraft();if(remainingExamSeconds<=0){clearInterval(examTimerInterval);alert('Hết giờ làm bài! Hệ thống sẽ tự động nộp bài.');submitHSKExam(true);}},1000);
     }
+    function initExamPersistence(){const root=document.getElementById('examActiveContainer');if(!root||root.dataset.persistenceReady==='1')return;root.dataset.persistenceReady='1';const save=()=>saveActiveExamDraft();root.addEventListener('input',save,{passive:true});root.addEventListener('change',save,{passive:true});window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();});}
 
-    function submitHSKExam(){
-      haptic(); clearInterval(examTimerInterval);
-      if(!currentExamData||typeof currentExamData!=='object'){alert('Không tìm thấy dữ liệu đề thi.');return;}
-      const L=currentExamData.listening||{}, R=currentExamData.reading||{}, W=currentExamData.writing||{};
-      const l1=L.part1_true_false||[], l2=L.part2_dialogue||[], r1=R.part1_fill_blank||[], r2=R.part2_comprehension||[], w1=W.part1_reorder||[], w2=W.part2_pinyin_to_hanzi||[];
-      let lc=0,rc=0,wc=0,review=[];
-      const norm=v=>String(v??'').trim();
-      l1.forEach((q,i)=>{const s=document.querySelector(`input[name="l1_ans_${i}"]:checked`);const right=s?((s.value==='true')===Boolean(q.answer)):false;if(right)lc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Listening · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Listening',q.audio_text||'',Boolean(q.answer)?'Đúng':'Sai',q.explanation||'');});
-      l2.forEach((q,i)=>{const s=document.querySelector(`input[name="l2_ans_${i}"]:checked`);const u=s?Number(s.value):-1;const right=u===Number(q.answer);if(right)lc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Listening · Câu ${i+l1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Listening',q.audio_dialogue||'',(q.options||[])[Number(q.answer)]||'',q.explanation||'');});
-      r1.forEach((q,i)=>{const u=norm(document.getElementById(`r1_ans_${i}`)?.value).toUpperCase();const right=u===norm(q.answer_key).toUpperCase();if(right)rc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(q.answer_key||'')} · ${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Reading',q.sentence||'',q.answer_key||'',q.explanation||'');});
-      r2.forEach((q,i)=>{const s=document.querySelector(`input[name="r2_ans_${i}"]:checked`);const u=s?Number(s.value):-1;const right=u===Number(q.answer);if(right)rc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+r1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);});
-      w1.forEach((q,i)=>{const u=norm(document.getElementById(`w1_ans_${i}`)?.value).replace(/\s+/g,'').replace(/[。！？!?]/g,'');const t=norm(q.correct_sentence).replace(/\s+/g,'').replace(/[。！？!?]/g,'');const right=!!t&&u===t;if(right)wc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Writing · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Writing',(q.tokens||[]).join(' / '),q.correct_sentence||'',q.explanation||'');});
-      w2.forEach((q,i)=>{const u=norm(document.getElementById(`w2_ans_${i}`)?.value);const t=norm(q.correct_hanzi);const right=!!t&&u===t;if(right)wc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Writing · Câu ${i+w1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(t)} · ${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Writing',q.sentence_with_blank||'',t,q.explanation||'');});
-      const lt=l1.length+l2.length,rt=r1.length+r2.length,wt=w1.length+w2.length;
-      const scoreL=lt?Math.round(lc/lt*100):null,scoreR=rt?Math.round(rc/rt*100):null,scoreW=wt?Math.round(wc/wt*100):null;
-      const activeScores=currentExamSkill==='Listening'?[scoreL]:currentExamSkill==='Reading'?[scoreR]:currentExamSkill==='Writing'?[scoreW]:[scoreL,scoreR,scoreW].filter(v=>v!==null);
-      const overall=Math.round(activeScores.reduce((a,b)=>a+b,0)/Math.max(1,activeScores.length));
-      const displayOverall=currentExamSkill==='Full_Mock'?overall*3:overall;
-      recordPracticeEvent({mode:'hsk-exam',score:displayOverall,listening:scoreL,reading:scoreR,writing:scoreW,skill:currentExamSkill});
-      document.getElementById('resultListeningScore').innerText=scoreL===null?'—':`${scoreL}/100`;
-      document.getElementById('resultReadingScore').innerText=scoreR===null?'—':`${scoreR}/100`;
-      document.getElementById('resultWritingScore').innerText=scoreW===null?'—':`${scoreW}/100`;
-      document.getElementById('resultTotalScore').innerHTML=`${currentExamSkill==='Full_Mock'?displayOverall:overall} <span class="text-xs text-stone-400 font-normal font-sans">/ ${currentExamSkill==='Full_Mock'?300:100} điểm</span>`;
-      const pass=document.getElementById('resultPassBadge'); const good=overall>=60;
-      pass.className=`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${good?'bg-emerald-100 text-emerald-800':'bg-rose-100 text-rose-800'}`;
-      pass.innerText=good?'ĐẠT MỨC MÔ PHỎNG':'CHƯA ĐẠT MỨC MÔ PHỎNG';
-      document.getElementById('examReviewList').innerHTML=review.join('');
-      document.getElementById('examActiveContainer').classList.add('hidden');document.getElementById('examResultContainer').classList.remove('hidden');
+    function submitHSKExam(autoSubmit=false){
+      if(examSubmitting)return;haptic();if(!currentExamData||typeof currentExamData!=='object'){alert('Không tìm thấy dữ liệu đề thi. Bài thi chưa bị xóa.');return;}examSubmitting=true;clearInterval(examTimerInterval);
+      const btns=[...document.querySelectorAll('#examActiveContainer button')].filter(b=>/Nộp Bài/.test(b.innerText||''));btns.forEach(b=>{b.disabled=true;b.dataset.oldHtml=b.innerHTML;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Đang chấm bài...';});saveActiveExamDraft();
+      try{
+        const L=currentExamData.listening||{},R=currentExamData.reading||{},W=currentExamData.writing||{};const l1=L.part1_true_false||[],l2=L.part2_dialogue||[],r1=R.part1_fill_blank||[],r2=R.part2_comprehension||[],w1=W.part1_reorder||[],w2=W.part2_pinyin_to_hanzi||[];let lc=0,rc=0,wc=0,review=[];const norm=v=>String(v??'').trim();
+        l1.forEach((q,i)=>{const s=document.querySelector(`input[name="l1_ans_${i}"]:checked`);const right=s?((s.value==='true')===Boolean(q.answer)):false;if(right)lc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Listening · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Listening',q.audio_text||'',Boolean(q.answer)?'Đúng':'Sai',q.explanation||'');});
+        l2.forEach((q,i)=>{const s=document.querySelector(`input[name="l2_ans_${i}"]:checked`);const u=s?Number(s.value):-1;const right=u===Number(q.answer);if(right)lc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Listening · Câu ${i+l1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Listening',q.audio_dialogue||'',(q.options||[])[Number(q.answer)]||'',q.explanation||'');});
+        r1.forEach((q,i)=>{const u=norm(document.getElementById(`r1_ans_${i}`)?.value).toUpperCase();const right=u===norm(q.answer_key).toUpperCase();if(right)rc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(q.answer_key||'')} · ${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Reading',q.sentence||'',q.answer_key||'',q.explanation||'');});
+        r2.forEach((q,i)=>{const s=document.querySelector(`input[name="r2_ans_${i}"]:checked`);const u=s?Number(s.value):-1;const right=u===Number(q.answer);if(right)rc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+r1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Reading',q.text||'',(q.options||[])[Number(q.answer)]||'',q.explanation||'');});
+        w1.forEach((q,i)=>{const u=norm(document.getElementById(`w1_ans_${i}`)?.value).replace(/\s+/g,'').replace(/[。！？!?]/g,'');const t=norm(q.correct_sentence).replace(/\s+/g,'').replace(/[。！？!?]/g,'');const right=!!t&&u===t;if(right)wc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Writing · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Writing',(q.tokens||[]).join(' / '),q.correct_sentence||'',q.explanation||'');});
+        w2.forEach((q,i)=>{const u=norm(document.getElementById(`w2_ans_${i}`)?.value);const t=norm(q.correct_hanzi);const right=!!t&&u===t;if(right)wc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Writing · Câu ${i+w1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(t)} · ${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Writing',q.sentence_with_blank||'',t,q.explanation||'');});
+        const lt=l1.length+l2.length,rt=r1.length+r2.length,wt=w1.length+w2.length;const scoreL=lt?Math.round(lc/lt*100):null,scoreR=rt?Math.round(rc/rt*100):null,scoreW=wt?Math.round(wc/wt*100):null;const activeScores=currentExamSkill==='Listening'?[scoreL]:currentExamSkill==='Reading'?[scoreR]:currentExamSkill==='Writing'?[scoreW]:[scoreL,scoreR,scoreW].filter(v=>v!==null);const overall=Math.round(activeScores.reduce((a,b)=>a+b,0)/Math.max(1,activeScores.length));const displayOverall=currentExamSkill==='Full_Mock'?overall*3:overall;
+        recordPracticeEvent({mode:'hsk-exam',score:displayOverall,listening:scoreL,reading:scoreR,writing:scoreW,skill:currentExamSkill});document.getElementById('resultListeningScore').innerText=scoreL===null?'—':`${scoreL}/100`;document.getElementById('resultReadingScore').innerText=scoreR===null?'—':`${scoreR}/100`;document.getElementById('resultWritingScore').innerText=scoreW===null?'—':`${scoreW}/100`;document.getElementById('resultTotalScore').innerHTML=`${displayOverall} <span class="text-xs text-stone-400 font-normal font-sans">/ ${currentExamSkill==='Full_Mock'?300:100} điểm</span>`;const pass=document.getElementById('resultPassBadge');const good=overall>=60;pass.className=`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${good?'bg-emerald-100 text-emerald-800':'bg-rose-100 text-rose-800'}`;pass.innerText=good?'ĐẠT MỨC MÔ PHỎNG':'CHƯA ĐẠT MỨC MÔ PHỎNG';document.getElementById('examReviewList').innerHTML=review.join('');document.getElementById('examActiveContainer').classList.add('hidden');document.getElementById('examResultContainer').classList.remove('hidden');saveExamResultState({completed:true,skill:currentExamSkill,questionCount:currentExamQuestionCount,scoreL,scoreR,scoreW,overall,displayOverall,good,reviewHtml:review.join('')});clearActiveExamDraft();updateDictionaryMode();
+      }catch(e){console.error('submitHSKExam failed:',e);saveActiveExamDraft();alert(`Nộp bài chưa hoàn tất nên bài làm vẫn được giữ lại.\n\nLỗi: ${e?.message||e}`);}finally{examSubmitting=false;btns.forEach(b=>{b.disabled=false;b.innerHTML=b.dataset.oldHtml||'<i class="fa-solid fa-paper-plane"></i> Nộp Bài & Chấm Điểm HSK 3.0';});}
     }
 
     function resetExamUI() {
-      haptic();
-      document.getElementById('examResultContainer').classList.add('hidden');
-      document.getElementById('examActiveContainer').classList.add('hidden');
-      document.getElementById('examConfigCard').classList.remove('hidden');
+      haptic();clearInterval(examTimerInterval);examSubmitting=false;clearActiveExamDraft();clearExamResultState();currentExamData=null;document.getElementById('examResultContainer').classList.add('hidden');document.getElementById('examActiveContainer').classList.add('hidden');document.getElementById('examConfigCard').classList.remove('hidden');updateDictionaryMode();
     }
 
     /* ================= TÌM KIẾM & QUẢN LÝ TỪ VỰNG ================= */
