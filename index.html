@@ -2752,8 +2752,22 @@ KIỂM TRA TRƯỚC KHI TRẢ:
               })));
             } else if(secName==='Reading'){
               if(type.includes('cloze')){
+                const bank=Array.isArray(part?.word_bank)?part.word_bank:[];
+                const resolveClozeKey=(rawAnswer)=>{
+                  const raw=String(rawAnswer??'').trim();
+                  if(/^[A-Za-z]$/.test(raw)) return raw.toUpperCase();
+                  const rawCompact=raw.replace(/^[A-Za-z][\\.)、:：-]\\s*/,'').trim();
+                  const hit=bank.find(w=>{
+                    const key=String(w?.key??'').trim().toUpperCase();
+                    const word=String(w?.word??'').trim();
+                    return key===raw.toUpperCase() || word===raw || word===rawCompact || String(w?.hanzi??'').trim()===raw;
+                  });
+                  if(hit?.key) return String(hit.key).trim().slice(0,1).toUpperCase();
+                  return rawCompact;
+                };
                 for(const q of qs){
-                  legacy.reading.part1_fill_blank.push({sentence:q.passage||q.sentence||q.sentence_with_blank||'',answer_key:String(q.correct_answer||q.answer_key||'').replace(/[^A-Za-z]/g,'').slice(0,1).toUpperCase(),explanation:q.explanation||'',tested_word:q.tested_word||''});
+                  const rawAnswer=q.correct_answer??q.answer_key??q.answer??'';
+                  legacy.reading.part1_fill_blank.push({sentence:q.passage||q.sentence||q.sentence_with_blank||'',answer_key:resolveClozeKey(rawAnswer),answer_word:String(q.correct_word||q.answer_word||q.word||q.tested_word||'').trim(),explanation:q.explanation||'',tested_word:q.tested_word||''});
                 }
               } else if(type.includes('reading_comprehension')||type.includes('comprehension')){
                 legacy.reading.part2_comprehension.push(...qs.map(q=>({text:q.passage||q.text||'',question:q.question_text||q.question||'',options:optionsToLegacy(q),answer:Math.max(0,(q.options||[]).findIndex(o=>String(o?.key||'').toUpperCase()===String(q.correct_answer||'').toUpperCase())),explanation:q.explanation||'',tested_word:q.tested_word||''})));
@@ -2800,7 +2814,11 @@ KIỂM TRA TRƯỚC KHI TRẢ:
         if(!Array.isArray(q?.options)||q.options.length<2||q.options.length>4) issues.push(`Listening MC ${i+1}: options phải 2-4`);
         if(!Number.isInteger(Number(q?.answer))||Number(q.answer)<0||Number(q.answer)>=q.options.length) issues.push(`Listening MC ${i+1}: đáp án không hợp lệ`);
       }
-      for(const [i,q] of (r.part1_fill_blank||[]).entries()) if(!q?.sentence||!/^[A-Z]$/.test(String(q?.answer_key||''))) issues.push(`Reading cloze ${i+1}: dữ liệu đáp án không hợp lệ`);
+      for(const [i,q] of (r.part1_fill_blank||[]).entries()){
+        const hasKey=/^[A-Z]$/.test(String(q?.answer_key||''));
+        const hasWord=String(q?.answer_word||q?.tested_word||'').trim().length>0;
+        if(!q?.sentence || (!hasKey && !hasWord)) issues.push(`Reading cloze ${i+1}: dữ liệu đáp án không hợp lệ`);
+      }
       for(const [i,q] of (r.part2_comprehension||[]).entries()){
         if(!q?.text||!q?.question) issues.push(`Reading ${i+1}: thiếu passage/question`);
         if(!Array.isArray(q?.options)||q.options.length<2||q.options.length>4) issues.push(`Reading ${i+1}: options không hợp lệ`);
@@ -2910,6 +2928,68 @@ ${vocabList}`;
       }catch(e){alert(`Không thể tạo đề sau khi thử toàn bộ API/model dự phòng.\n\n${e?.message||e}`);}
       finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Tạo Đề Thi HSK 3.0';}
     }
+    let activeReadingBlankInput=null;
+    function setActiveReadingBlank(input){ activeReadingBlankInput=input||null; }
+    function clearReadingBlank(idx){
+      const input=document.getElementById(`r1_ans_${idx}`);
+      if(input){ input.value=''; input.focus(); setActiveReadingBlank(input); }
+      const hint=document.getElementById(`r1_hint_${idx}`);
+      if(hint) hint.innerText='Bấm vào một từ trong khung để điền tự động.';
+    }
+    function startReadingBankDrag(event,key,word){
+      try{ event.dataTransfer.effectAllowed='copy'; event.dataTransfer.setData('text/plain', JSON.stringify({key:key||'',word:word||''})); }catch(e){}
+    }
+    function resolveReadingBankChoice(keyOrWord,word,bank){
+      const raw=String(keyOrWord??'').trim();
+      const shownWord=String(word??'').trim();
+      const list=Array.isArray(bank)?bank:[];
+      const hit=list.find(w=>{
+        const k=String(w?.key??'').trim().toUpperCase();
+        const wd=String(w?.word??w?.hanzi??'').trim();
+        return (raw && k===raw.toUpperCase()) || (shownWord && wd===shownWord) || (raw && wd===raw);
+      });
+      if(hit) return {key:String(hit?.key??'').trim().toUpperCase(),word:String(hit?.word??hit?.hanzi??'').trim()};
+      return {key:/^[A-Z]$/.test(raw)?raw.toUpperCase():'',word:shownWord||raw};
+    }
+    function pickReadingBankWord(key,word){
+      const input=activeReadingBlankInput || document.querySelector('#readingPart1List input[id^=\"r1_ans_\"]:focus') || [...document.querySelectorAll('#readingPart1List input[id^=\"r1_ans_\"]')].find(el=>!String(el.value||'').trim());
+      if(!input) return;
+      const choice=resolveReadingBankChoice(key,word,currentExamData?.reading?.word_bank||[]);
+      input.value=choice.key||choice.word;
+      setActiveReadingBlank(input);
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      const idx=String(input.id).split('_').pop();
+      const hint=document.getElementById(`r1_hint_${idx}`);
+      if(hint) hint.innerText=choice.word ? `Đã chọn: ${choice.word}${choice.key?` (${choice.key})`:''}` : 'Đã chọn từ trong khung.';
+      haptic();
+    }
+    function dropReadingBankWord(event,input){
+      event.preventDefault();
+      let data=null;
+      try{ data=JSON.parse(event.dataTransfer.getData('text/plain')||'null'); }catch(e){}
+      if(data) { setActiveReadingBlank(input); pickReadingBankWord(data.key||'',data.word||''); }
+    }
+    function readingClozeAnswerMatches(userValue,q,bank){
+      const user=String(userValue??'').trim();
+      if(!user) return false;
+      const expectedKey=String(q?.answer_key??'').trim().toUpperCase();
+      const expectedWords=[String(q?.answer_word??'').trim(),String(q?.tested_word??'').trim()].filter(Boolean);
+      const choice=resolveReadingBankChoice(user,user,bank);
+      if(expectedKey && choice.key===expectedKey) return true;
+      if(expectedWords.some(w=>w===user || w===choice.word)) return true;
+      const matchingBank=Array.isArray(bank)?bank.find(w=>String(w?.key??'').trim().toUpperCase()===expectedKey):null;
+      const bankWord=String(matchingBank?.word??matchingBank?.hanzi??'').trim();
+      return !!bankWord && (user===bankWord || user===String(choice.word||''));
+    }
+    function readingClozeDisplayAnswer(q,bank){
+      const key=String(q?.answer_key??'').trim().toUpperCase();
+      const expectedWord=String(q?.answer_word||'').trim();
+      if(expectedWord) return key?`${key} · ${expectedWord}`:expectedWord;
+      const hit=Array.isArray(bank)?bank.find(w=>String(w?.key??'').trim().toUpperCase()===key):null;
+      const word=String(hit?.word??hit?.hanzi??'').trim();
+      return word?(key?`${key} · ${word}`:word):(key||'—');
+    }
+
     function renderActiveExamUI(level){
       currentExamData=normalizeExamData(currentExamData);
       const issues=validateLegacyExam(currentExamData,currentExamSkill,currentExamQuestionCount);
@@ -2931,9 +3011,23 @@ ${vocabList}`;
       const l2Container=document.getElementById('listenPart2List');
       l2Container.innerHTML=l2.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+l1.length+1}</span><button onclick="speakListening('${safeJS(String(q.audio_dialogue||'').replace(/\\n/g,' '))}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">${escapeHTML(q.question||'')}</p><div class="space-y-1.5">${(q.options||[]).map((opt,oi)=>`<label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 text-xs"><input type="radio" name="l2_ans_${idx}" value="${oi}"><span>${escapeHTML(opt)}</span></label>`).join('')}</div></div>`).join('');
 
-      document.getElementById('readingBankContainer').innerHTML=(currentExamData.reading.word_bank||[]).map(w=>`<span class="px-2.5 py-1 bg-white border border-red-200 rounded-lg text-red-900 shadow-sm"><strong>${escapeHTML(w.key||'')}</strong> ${escapeHTML(w.word||'')} <span class="text-[10px] text-stone-400">${escapeHTML(w.pinyin||'')}</span></span>`).join('');
+      const readingBank=currentExamData.reading.word_bank||[];
+      document.getElementById('readingBankContainer').innerHTML=readingBank.length
+        ? readingBank.map((w,bi)=>{
+            const key=String(w?.key??'').trim();
+            const word=String(w?.word??w?.hanzi??'').trim();
+            const pinyin=String(w?.pinyin??'').trim();
+            const safeKey=safeJS(key);
+            const safeWord=safeJS(word);
+            return `<button type="button" draggable="true" ondragstart="startReadingBankDrag(event, '${safeKey}', '${safeWord}')" onclick="pickReadingBankWord('${safeKey}', '${safeWord}')" class="reading-bank-word px-2.5 py-1.5 bg-white border border-red-200 rounded-lg text-red-900 shadow-sm active:scale-95 transition select-none" data-reading-bank-key="${escapeHTML(key)}" data-reading-bank-word="${escapeHTML(word)}"><strong>${escapeHTML(key||String.fromCharCode(65+bi))}</strong> ${escapeHTML(word)} <span class="text-[10px] text-stone-400">${escapeHTML(pinyin)}</span></button>`;
+          }).join('')
+        : `<span class="text-[10px] text-stone-400 font-medium">Không có khung từ cho phần này.</span>`;
       const r1Container=document.getElementById('readingPart1List');
-      r1Container.innerHTML=r1.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2"><span class="font-bold text-xs text-red-600">Câu ${idx+1}</span><div class="p-2 bg-white rounded-lg border border-stone-200 font-hanzi text-sm font-bold dict-selectable">${escapeHTML(q.sentence||'')}</div><div class="flex items-center gap-2"><span class="text-xs font-bold">Điền:</span><input type="text" id="r1_ans_${idx}" maxlength="1" class="w-16 text-center uppercase bg-white border border-stone-200 rounded-lg p-1.5 text-xs font-bold outline-none"></div></div>`).join('');
+      r1Container.innerHTML=r1.map((q,idx)=>{
+        const expected=String(q.answer_key||'').trim().toUpperCase();
+        const wordHint=String(q.answer_word||q.tested_word||'').trim();
+        return `<div class="reading-cloze-question p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2" data-reading-index="${idx}"><span class="font-bold text-xs text-red-600">Câu ${idx+1}</span><div class="p-2 bg-white rounded-lg border border-stone-200 font-hanzi text-sm font-bold dict-selectable">${escapeHTML(q.sentence||'')}</div><div class="flex items-center gap-2"><span class="text-xs font-bold">Điền:</span><input type="text" id="r1_ans_${idx}" maxlength="40" autocomplete="off" autocapitalize="characters" onfocus="setActiveReadingBlank(this)" ondragover="event.preventDefault()" ondrop="dropReadingBankWord(event, this)" class="w-24 text-center bg-white border border-stone-200 rounded-lg p-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-red-500" placeholder="A/B/C" value=""><button type="button" onclick="clearReadingBlank(${idx})" class="px-2 py-1.5 bg-stone-100 text-stone-500 rounded-lg text-[10px] font-bold" title="Xóa lựa chọn"><i class="fa-solid fa-xmark"></i></button></div><div id="r1_hint_${idx}" class="text-[10px] text-stone-400 min-h-4">${wordHint?`Từ đúng: ${escapeHTML(wordHint)}`:'Bấm vào một từ trong khung để điền tự động.'}</div></div>`;
+      }).join('');
       const r2Container=document.getElementById('readingPart2List');
       r2Container.innerHTML=r2.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><span class="font-bold text-xs text-red-600">Câu ${idx+r1.length+1}</span><div class="p-2.5 bg-white rounded-lg border border-stone-200 font-hanzi text-xs leading-relaxed dict-selectable">${escapeHTML(q.text||'')}</div><p class="text-xs font-semibold">${escapeHTML(q.question||'')}</p><div class="space-y-1.5">${(q.options||[]).map((opt,oi)=>`<label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 text-xs"><input type="radio" name="r2_ans_${idx}" value="${oi}"><span>${escapeHTML(opt)}</span></label>`).join('')}</div></div>`).join('');
 
@@ -2958,7 +3052,14 @@ ${vocabList}`;
         const L=currentExamData.listening||{},R=currentExamData.reading||{},W=currentExamData.writing||{};const l1=L.part1_true_false||[],l2=L.part2_dialogue||[],r1=R.part1_fill_blank||[],r2=R.part2_comprehension||[],w1=W.part1_reorder||[],w2=W.part2_pinyin_to_hanzi||[];let lc=0,rc=0,wc=0,review=[];const norm=v=>String(v??'').trim();
         l1.forEach((q,i)=>{const s=document.querySelector(`input[name="l1_ans_${i}"]:checked`);const right=s?((s.value==='true')===Boolean(q.answer)):false;if(right)lc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Listening · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Listening',q.audio_text||'',Boolean(q.answer)?'Đúng':'Sai',q.explanation||'');});
         l2.forEach((q,i)=>{const s=document.querySelector(`input[name="l2_ans_${i}"]:checked`);const u=s?Number(s.value):-1;const right=u===Number(q.answer);if(right)lc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Listening · Câu ${i+l1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Listening',q.audio_dialogue||'',(q.options||[])[Number(q.answer)]||'',q.explanation||'');});
-        r1.forEach((q,i)=>{const u=norm(document.getElementById(`r1_ans_${i}`)?.value).toUpperCase();const right=u===norm(q.answer_key).toUpperCase();if(right)rc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(q.answer_key||'')} · ${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Reading',q.sentence||'',q.answer_key||'',q.explanation||'');});
+        r1.forEach((q,i)=>{
+          const u=norm(document.getElementById(`r1_ans_${i}`)?.value);
+          const right=readingClozeAnswerMatches(u,q,R.word_bank||[]);
+          if(right)rc++;
+          const answerDisplay=readingClozeDisplayAnswer(q,R.word_bank||[]);
+          review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(answerDisplay)} · ${escapeHTML(q.explanation||'')}</div></div>`);
+          if(!right)recordLearningError('HSK Reading',q.sentence||'',answerDisplay,q.explanation||'');
+        });
         r2.forEach((q,i)=>{const s=document.querySelector(`input[name="r2_ans_${i}"]:checked`);const u=s?Number(s.value):-1;const right=u===Number(q.answer);if(right)rc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Reading · Câu ${i+r1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Reading',q.text||'',(q.options||[])[Number(q.answer)]||'',q.explanation||'');});
         w1.forEach((q,i)=>{const u=norm(document.getElementById(`w1_ans_${i}`)?.value).replace(/\s+/g,'').replace(/[。！？!?]/g,'');const t=norm(q.correct_sentence).replace(/\s+/g,'').replace(/[。！？!?]/g,'');const right=!!t&&u===t;if(right)wc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Writing · Câu ${i+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Writing',(q.tokens||[]).join(' / '),q.correct_sentence||'',q.explanation||'');});
         w2.forEach((q,i)=>{const u=norm(document.getElementById(`w2_ans_${i}`)?.value);const t=norm(q.correct_hanzi);const right=!!t&&u===t;if(right)wc++;review.push(`<div class="p-3 bg-white rounded-xl border ${right?'border-emerald-200':'border-rose-200'} text-xs"><b>Writing · Câu ${i+w1.length+1}</b> · ${right?'✓ Đúng':'✗ Sai'}<div class="text-stone-500 mt-1">Đáp án: ${escapeHTML(t)} · ${escapeHTML(q.explanation||'')}</div></div>`);if(!right)recordLearningError('HSK Writing',q.sentence_with_blank||'',t,q.explanation||'');});
