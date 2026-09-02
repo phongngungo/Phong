@@ -2016,7 +2016,7 @@ KIỂM TRA TRƯỚC KHI TRẢ:
       if (!cleanText || !key || !region) return false;
 
       const endpoint = `https://${encodeURIComponent(region)}.tts.speech.microsoft.com/cognitiveservices/v1`;
-      const ssml = `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${Math.round(((options.rate ?? 0.72) - 1) * 100)}%" pitch="0%">${escapeXmlForSsml(cleanText)}</prosody></voice></speak>`;
+      const ssml = `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${Math.round(((options.rate ?? 0.90) - 1) * 100)}%" pitch="0%">${escapeXmlForSsml(cleanText)}</prosody></voice></speak>`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -2136,8 +2136,8 @@ KIỂM TRA TRƯỚC KHI TRẢ:
             activeTtsAudio = audio;
             audio.preload = 'auto';
             audio.volume = 1;
-            audio.playbackRate = Number(options.rate ?? 0.72);
-            audio.defaultPlaybackRate = Number(options.rate ?? 0.72);
+            audio.playbackRate = Number(options.rate ?? 0.90);
+            audio.defaultPlaybackRate = Number(options.rate ?? 0.90);
             audio.playsInline = true;
             audio.setAttribute('playsinline', '');
             audio.onended = () => {
@@ -2198,7 +2198,7 @@ KIỂM TRA TRƯỚC KHI TRẢ:
         if (voice) utterance.voice = voice;
         utterance.lang = voice?.lang || 'zh-CN';
         utterance.pitch = 1.08;
-        utterance.rate = Number(options.rate ?? 0.72);
+        utterance.rate = Number(options.rate ?? 0.90);
         utterance.volume = 1.0;
         utterance.onstart = () => { started = true; };
         utterance.onend = () => finish(started);
@@ -2219,7 +2219,9 @@ KIỂM TRA TRƯỚC KHI TRẢ:
 
     // Giọng riêng cho phần Listening của đề thi: chậm, rõ, dễ bắt âm hơn nhưng không làm chậm toàn bộ app.
     function speakListening(text) {
-      return speakHanzi(text, { rate: 0.68, listening: true });
+      // Tốc độ Listening mô phỏng giọng đọc tự nhiên của đề HSK: rõ ràng, không quá chậm/nhanh.
+      // HSK không quy định một hệ số playback cố định; 0.90 là mức hiệu chỉnh cho TTS trong app.
+      return speakHanzi(text, { rate: 0.90, listening: true });
     }
 
     async function speakHanzi(text, options = {}) {
