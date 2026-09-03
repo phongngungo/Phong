@@ -112,7 +112,7 @@
           <h1 class="font-extrabold text-base tracking-tight leading-tight truncate">Khảo Thí HSK 3.0</h1>
           <div class="flex items-center gap-1.5 mt-0.5">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-            <p id="headerModelBadge" class="text-[10px] text-red-100 font-mono font-medium truncate">gemini-3.6-flash</p>
+            <p id="headerModelBadge" class="text-[10px] text-red-100 font-mono font-medium truncate">gemini-3.7-flash</p>
           </div>
         </div>
       </div>
@@ -206,7 +206,7 @@
           <i class="fa-solid fa-shield-halved text-red-600"></i> Chuỗi Auto-Fallback khi hết Quota:
         </div>
         <p class="text-[10px] text-stone-600 leading-relaxed font-mono">
-          3.6 Flash → 3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 2.5 Flash Lite
+          3.7 Flash → 3.6 Flash → 3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 2.5 Flash
         </p>
       </div>
 
@@ -1098,26 +1098,44 @@ SCHEMA PHẢI TUÂN THỦ:
       const keys = getGeminiApiKeys();
       if (!keys.length) throw new Error('Chưa có Gemini API Key.');
       let lastError = null;
+      let attemptedAny = false;
       for (const model of models) {
         for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
           const key = keys[keyIndex];
+          // Không đứng chờ một key đang cooldown; chuyển ngay sang key/model khác.
+          const cooldownLeft = getGeminiCooldownMs(key);
+          if (cooldownLeft > 0) {
+            onKeyError?.({ model, keyIndex, skipped: true, cooldownLeft, error: new Error('KEY_COOLDOWN') });
+            console.info(`Gemini skip cooldown: model=${model}, API=${keyIndex + 1}/${keys.length}, còn ${Math.ceil(cooldownLeft / 1000)}s`);
+            continue;
+          }
+          attemptedAny = true;
           onAttempt?.({ model, keyIndex, keyCount: keys.length });
           try {
-            const data = await fetchGeminiWithKey(model, key, bodyFactory(model, key), { jitterMs: 700 + Math.floor(Math.random() * 900) });
+            const data = await fetchGeminiWithKey(
+              model,
+              key,
+              bodyFactory(model, key),
+              { jitterMs: 220 + Math.floor(Math.random() * 320) }
+            );
             return { data, model, keyIndex };
           } catch (error) {
             lastError = error;
             onKeyError?.({ model, keyIndex, error });
             console.warn(`Gemini fallback: model=${model}, key=${keyIndex + 1}/${keys.length}`, error);
-            // API lỗi/quota thì chuyển sang key kế tiếp; không cố vượt qua giới hạn.
+            // API lỗi/quota thì chuyển ngay sang key/model kế tiếp.
             continue;
           }
         }
+      }
+      if (!attemptedAny) {
+        throw new Error('Tất cả API Key đang trong thời gian cooldown. Hãy thử lại sau.');
       }
       throw lastError || new Error('Không thể gọi Gemini bằng các API Key hiện có.');
     }
 
     const MODEL_FALLBACK_CHAIN = [
+      'gemini-3.7-flash',
       'gemini-3.6-flash',
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
@@ -1173,6 +1191,7 @@ KIỂM TRA TRƯỚC KHI TRẢ:
 - Không có markdown, không có lời giải thích ngoài JSON.`;
 
     const COMMUNICATION_MODEL_FALLBACK_CHAIN = [
+      'gemini-3.7-flash',
       'gemini-3.6-flash',
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
@@ -2010,13 +2029,40 @@ KIỂM TRA TRƯỚC KHI TRẢ:
         .replace(/'/g, '&apos;');
     }
 
+    function buildNaturalChineseSsml(text, options = {}) {
+      const clean = normalizeSpeechText(text);
+      if (!clean) return '';
+
+      const baseRate = Number(options.rate ?? 0.92);
+      // Tách câu và mệnh đề để Azure Neural không đọc liền một mạch.
+      const parts = clean
+        .split(/(?<=[。！？!?；;])|(?<=[，,、])(?=.{2,})/)
+        .map(x => x.trim())
+        .filter(Boolean);
+
+      const body = parts.map((part, index) => {
+        const isQuestion = /[？?]$/.test(part);
+        const isExclaim = /[！!]$/.test(part);
+        const pitch = isQuestion ? 3.5 : (isExclaim ? 2.0 : (index % 3 === 1 ? 1.0 : -0.5));
+        const rateOffset = index % 4 === 0 ? -1.5 : (index % 4 === 2 ? 1.0 : 0);
+        const rate = `${Math.round((baseRate - 1) * 100 + rateOffset)}%`;
+        const safe = escapeXmlForSsml(part);
+        const breakMs = /[。！？!?；;]$/.test(part)
+          ? (isQuestion ? 320 : (isExclaim ? 260 : 220))
+          : 110;
+        return `<prosody rate="${rate}" pitch="${pitch >= 0 ? '+' : ''}${pitch}st">${safe}</prosody><break time="${breakMs}ms"/>`;
+      }).join('');
+
+      return `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}">${body}</voice></speak>`;
+    }
+
     async function speakWithAzureXiaoyi(text, options = {}) {
       const cleanText = normalizeSpeechText(text);
       const { key, region } = getAzureSpeechConfig();
       if (!cleanText || !key || !region) return false;
 
       const endpoint = `https://${encodeURIComponent(region)}.tts.speech.microsoft.com/cognitiveservices/v1`;
-      const ssml = `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${Math.round(((options.rate ?? 0.90) - 1) * 100)}%" pitch="0%">${escapeXmlForSsml(cleanText)}</prosody></voice></speak>`;
+      const ssml = buildNaturalChineseSsml(cleanText, options);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -2126,6 +2172,7 @@ KIỂM TRA TRƯỚC KHI TRẢ:
         const urls = buildRemoteChineseTTSUrls(text);
         let index = 0;
         let lastErr = null;
+        let playbackStarted = false;
 
         const tryNext = () => {
           if (index >= urls.length) { reject(lastErr || new Error('REMOTE_TTS_FAILED')); return; }
@@ -2184,44 +2231,82 @@ KIỂM TRA TRƯỚC KHI TRẢ:
 
     function speakWithSystemTTS(text, options = {}) {
       if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return Promise.resolve(false);
+
       return waitForSpeechVoices().then(() => new Promise(resolve => {
-        let started = false;
-        let done = false;
+        const clean = normalizeSpeechText(text);
+        const voice = getStandardNativeVoice();
+        const chunks = clean
+          .split(/(?<=[。！？!?；;])/)
+          .map(x => x.trim())
+          .filter(Boolean);
+
+        let index = 0;
+        let startedAny = false;
+        let finished = false;
+        const baseRate = Number(options.rate ?? 0.92);
+
         const finish = ok => {
-          if (done) return;
-          done = true;
-          if (timer) clearTimeout(timer);
+          if (finished) return;
+          finished = true;
           resolve(ok);
         };
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voice = getStandardNativeVoice();
-        if (voice) utterance.voice = voice;
-        utterance.lang = voice?.lang || 'zh-CN';
-        utterance.pitch = 1.08;
-        utterance.rate = Number(options.rate ?? 0.90);
-        utterance.volume = 1.0;
-        utterance.onstart = () => { started = true; };
-        utterance.onend = () => finish(started);
-        utterance.onerror = e => { ttsLastError = e; finish(false); };
-        let timer = setTimeout(() => finish(started), 1800);
-        try {
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.resume();
-          window.speechSynthesis.speak(utterance);
-          // A second resume fixes a known paused-queue state in Android Chromium/WebView.
-          setTimeout(() => { try { window.speechSynthesis.resume(); } catch (_) {} }, 120);
-        } catch (e) {
-          ttsLastError = e;
-          finish(false);
-        }
+
+        const speakNext = () => {
+          if (finished) return;
+          if (index >= chunks.length) {
+            finish(startedAny);
+            return;
+          }
+
+          const chunk = chunks[index++];
+          const isQuestion = /[？?]$/.test(chunk);
+          const isExclaim = /[！!]$/.test(chunk);
+          const utterance = new SpeechSynthesisUtterance(chunk);
+
+          if (voice) utterance.voice = voice;
+          utterance.lang = voice?.lang || 'zh-CN';
+          utterance.pitch = isQuestion ? 1.18 : (isExclaim ? 1.13 : (index % 3 === 0 ? 1.06 : 1.02));
+          utterance.rate = Math.max(0.72, Math.min(1.05, baseRate + (index % 4 === 2 ? 0.025 : (index % 4 === 0 ? -0.02 : 0))));
+          utterance.volume = 1.0;
+
+          let watchdog = setTimeout(() => {
+            try { window.speechSynthesis.cancel(); } catch (_) {}
+            if (!startedAny) finish(false);
+            else setTimeout(speakNext, 120);
+          }, Math.max(2600, clean.length * 120));
+
+          utterance.onstart = () => { startedAny = true; };
+          utterance.onend = () => {
+            clearTimeout(watchdog);
+            // Ngắt mảnh giữa các câu để mô phỏng nhịp hội thoại.
+            setTimeout(speakNext, isQuestion ? 260 : (isExclaim ? 220 : 180));
+          };
+          utterance.onerror = e => {
+            clearTimeout(watchdog);
+            ttsLastError = e;
+            if (!startedAny) finish(false);
+            else setTimeout(speakNext, 80);
+          };
+
+          try {
+            window.speechSynthesis.resume();
+            window.speechSynthesis.speak(utterance);
+            setTimeout(() => { try { window.speechSynthesis.resume(); } catch (_) {} }, 120);
+          } catch (e) {
+            clearTimeout(watchdog);
+            ttsLastError = e;
+            finish(false);
+          }
+        };
+
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+        speakNext();
       }));
     }
 
-    // Giọng riêng cho phần Listening của đề thi: chậm, rõ, dễ bắt âm hơn nhưng không làm chậm toàn bộ app.
+    // Giọng riêng cho Listening: rõ nhưng có nhịp, có khoảng nghỉ và lên xuống nhẹ như người thật.
     function speakListening(text) {
-      // Tốc độ Listening mô phỏng giọng đọc tự nhiên của đề HSK: rõ ràng, không quá chậm/nhanh.
-      // HSK không quy định một hệ số playback cố định; 0.90 là mức hiệu chỉnh cho TTS trong app.
-      return speakHanzi(text, { rate: 0.90, listening: true });
+      return speakHanzi(text, { rate: 0.92, listening: true, naturalProsody: true });
     }
 
     async function speakHanzi(text, options = {}) {
@@ -2851,6 +2936,8 @@ YÊU CẦU: phân bố dạng bài, độ dài, độ khó, distractor, ngữ ph
 QUY TẮC BẮT BUỘC CHO READING: phải tạo ĐỦ đúng số câu Reading theo phân bổ ở trên. Với MỖI câu reading_comprehension, trường passage phải chứa đoạn văn/câu dẫn hoàn chỉnh và question_text (hoặc question) phải chứa câu hỏi hoàn chỉnh. Không được để passage hoặc question rỗng, không được gộp nhiều câu vào một object, không được bỏ bớt câu để rút ngắn output. Với cloze_test, sentence phải có chỗ trống và correct_answer phải tồn tại trong options/word bank theo schema. Nếu output dài, vẫn ưu tiên đủ số câu hơn phần giải thích dài.
 
 Trả về DUY NHẤT JSON object theo schema hiện có, không markdown.
+Không dùng temperature/top_p/top_k trong yêu cầu hay mô tả cấu hình; hệ thống tự cấu hình theo model.
+ƯU TIÊN tính đầy đủ và hợp lệ của dữ liệu hơn giải thích dài; không cắt bớt Reading ở cuối response.
 
 VỐN TỪ MỤC TIÊU:
 ${vocabList}`;
@@ -2862,10 +2949,15 @@ ${vocabList}`;
       const repairPrompt = `Bạn đang sửa một đề thi HSK 3.0 đã được AI tạo nhưng FAIL kiểm tra dữ liệu.\n\nCấp độ: ${level}\nKỹ năng: ${skill}\nSố câu bắt buộc: ${p.skillTotal}\nPhân bổ bắt buộc: ${skill==='Full_Mock' ? `Listening ${p.listening}[${p.listeningParts.join('+')}], Reading ${p.reading}[${p.readingParts.join('+')}], Writing ${p.writing}[${p.writingParts.join('+')}]` : `${skill} ${p.skillTotal}[${p.skillParts.join('+')}]`}\n\nLỗi kiểm tra: ${issueText}\n\nDỮ LIỆU HIỆN TẠI:\n${JSON.stringify(parsedData)}\n\nHãy SỬA TRỰC TIẾP dữ liệu trên và trả về DUY NHẤT 1 JSON object đúng schema hiện có.\nĐẶC BIỆT: Reading phải đủ đúng ${p.reading} câu nếu skill=${skill}; mọi reading_comprehension phải có passage KHÔNG RỖNG và question_text/question KHÔNG RỖNG; không được xóa các câu hợp lệ. Nếu thiếu passage/question hoặc thiếu câu, hãy TẠO BỔ SUNG nội dung HSK phù hợp dựa trên vốn từ mục tiêu dưới đây.\n\nVỐN TỪ MỤC TIÊU:\n${targetVocab.map(v=>`${v.hanzi} (${v.pinyin||''} - ${v.hanviet_meaning||v.meaning||''})`).join(', ')}`;
       const {data, model, keyIndex}=await runGeminiWithKeyPool({
         models: MODEL_FALLBACK_CHAIN,
-        bodyFactory:(activeModel)=>({
-          contents:[{parts:[{text:EXAM_SYSTEM_PROMPT},{text:repairPrompt}]}],
-          generationConfig:{responseMimeType:'application/json',maxOutputTokens:20000,temperature:0.15}
-        }),
+        bodyFactory:(activeModel)=>{
+          const generationConfig={responseMimeType:'application/json',maxOutputTokens:24000};
+          if(/^gemini-3\./.test(activeModel)){
+            generationConfig.thinkingConfig={thinkingLevel:'medium'};
+          }else{
+            generationConfig.temperature=0.15;
+          }
+          return {contents:[{parts:[{text:EXAM_SYSTEM_PROMPT},{text:repairPrompt}]}],generationConfig};
+        },
         onAttempt:({model,keyIndex,keyCount})=>{
           const btn=document.getElementById('generateExamBtn');
           if(btn) btn.innerHTML=`<i class="fa-solid fa-screwdriver-wrench"></i> Sửa đề · ${model} · API ${keyIndex+1}/${keyCount}...`;
@@ -2879,6 +2971,198 @@ ${vocabList}`;
       const fixedIssues=validateLegacyExam(normalized,skill,p.skillTotal);
       if(fixedIssues.length) throw new Error(`Sửa đề vẫn chưa đạt: ${fixedIssues.slice(0,4).join('; ')}`);
       return {normalized,model,keyIndex};
+    }
+
+
+    // ================= READING GENERATION ROBUST PIPELINE =================
+    // Reading được chia thành các lô nhỏ để tránh JSON quá dài, thiếu passage/question
+    // hoặc model bỏ bớt câu ở cuối response. Mỗi lô vẫn được hưởng toàn bộ fallback 6 model × nhiều API Key.
+    const READING_BATCH_SIZE = 10;
+
+    function buildExamGenerationConfig(activeModel, maxOutputTokens=10000, temperature=0.2) {
+      const generationConfig = {
+        responseMimeType: 'application/json',
+        maxOutputTokens
+      };
+      if (/^gemini-3\./.test(activeModel)) {
+        // Gemini 3.x: không gửi temperature/top_p/top_k.
+        generationConfig.thinkingConfig = {thinkingLevel:'medium'};
+      } else {
+        generationConfig.temperature = temperature;
+      }
+      return generationConfig;
+    }
+
+    function getReadingBatchPlan(level, batchStart, batchCount, batchType) {
+      const p = getOfficialExamPlan(level, 'Reading');
+      const end = Math.min(p.skillTotal, batchStart + batchCount);
+      return {total:p.skillTotal, start:batchStart + 1, end, count:end-batchStart, type:batchType};
+    }
+
+    function buildReadingBatchPrompt(level, batchInfo, targetVocab) {
+      const vocabList = targetVocab
+        .map(v => `${v.hanzi} (${v.pinyin||''} - ${v.hanviet_meaning||v.meaning||''})`)
+        .join(', ');
+
+      if (batchInfo.type === 'cloze_test') {
+        return `Bạn là chuyên gia ra đề HSK 3.0. Chỉ tạo MỘT LÔ Reading dạng 选词填空 (cloze_test).
+Cấp độ: ${level}
+Số câu lô này: ${batchInfo.count} câu, đánh số từ ${batchInfo.start} đến ${batchInfo.end}.
+Không được tạo thừa/thiếu câu.
+Mỗi câu phải có sentence đầy đủ với một chỗ trống, word_bank dùng chung gồm đủ từ gây nhiễu hợp lý, và correct_answer tồn tại trong word_bank.
+Mỗi câu có explanation ngắn.
+Ưu tiên từ mục tiêu nhưng câu phải tự nhiên, đúng trình độ.
+Trả DUY NHẤT JSON object:
+{"word_bank":[{"key":"A","word":"..."}],"questions":[{"id":${batchInfo.start},"sentence":"... ___ ...","correct_answer":"A","correct_word":"...","explanation":"...","tested_word":"..."}]}
+KHÔNG markdown, KHÔNG văn bản ngoài JSON.
+
+VỐN TỪ MỤC TIÊU:
+${vocabList}`;
+      }
+
+      return `Bạn là chuyên gia ra đề HSK 3.0. Chỉ tạo MỘT LÔ Reading dạng 阅读理解 (reading_comprehension).
+Cấp độ: ${level}
+Số câu lô này: ${batchInfo.count} câu, đánh số từ ${batchInfo.start} đến ${batchInfo.end}.
+Không được tạo thừa/thiếu câu.
+Mỗi object question BẮT BUỘC có:
+- passage: đoạn/câu đọc hoàn chỉnh, không rỗng.
+- question_text: câu hỏi hoàn chỉnh, không rỗng.
+- options: đúng 4 lựa chọn {"key":"A","text":"..."} ... {"key":"D","text":"..."}.
+- correct_answer: một key A/B/C/D.
+- explanation: giải thích ngắn.
+Không được gộp nhiều câu vào một object. Passage phải phù hợp cấp độ và đủ thông tin để suy luận đáp án. Distractor phải hợp lý nhưng chỉ có 1 đáp án đúng.
+Trả DUY NHẤT JSON object:
+{"questions":[{"id":${batchInfo.start},"passage":"...","question_text":"...","options":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correct_answer":"A","explanation":"...","tested_word":"..."}]}
+KHÔNG markdown, KHÔNG văn bản ngoài JSON.
+
+VỐN TỪ MỤC TIÊU:
+${vocabList}`;
+    }
+
+    function normalizeReadingBatchPayload(payload, batchInfo) {
+      const obj = payload && typeof payload === 'object' ? payload : {};
+      const questions = Array.isArray(obj.questions) ? obj.questions : [];
+      if (questions.length !== batchInfo.count) {
+        throw new Error(`Reading batch ${batchInfo.start}-${batchInfo.end}: cần ${batchInfo.count} câu, nhận ${questions.length}`);
+      }
+
+      if (batchInfo.type === 'cloze_test') {
+        const bank = Array.isArray(obj.word_bank) ? obj.word_bank : [];
+        const normalized = questions.map((q, i) => {
+          const answer = String(q?.correct_answer ?? q?.answer_key ?? q?.answer ?? '').trim();
+          const sentence = String(q?.sentence ?? q?.passage ?? '').trim();
+          if (!sentence || !answer) throw new Error(`Reading cloze batch: câu ${batchInfo.start+i} thiếu sentence/correct_answer`);
+          return {
+            sentence,
+            answer_key: /^[A-Za-z]$/.test(answer) ? answer.toUpperCase() : '',
+            answer_word: String(q?.correct_word ?? q?.answer_word ?? q?.word ?? '').trim(),
+            explanation: String(q?.explanation ?? '').trim(),
+            tested_word: String(q?.tested_word ?? '').trim()
+          };
+        });
+        if (bank.length < 3) throw new Error('Reading cloze batch: word_bank quá ngắn');
+        return {word_bank:bank, part1_fill_blank:normalized};
+      }
+
+      const normalized = questions.map((q, i) => {
+        const text = String(q?.passage ?? q?.text ?? '').trim();
+        const question = String(q?.question_text ?? q?.question ?? '').trim();
+        const options = Array.isArray(q?.options) ? q.options : [];
+        const answerKey = String(q?.correct_answer ?? q?.answer ?? '').trim().toUpperCase();
+        const answer = options.findIndex(o => String(o?.key ?? '').trim().toUpperCase() === answerKey);
+        if (!text || !question) throw new Error(`Reading comprehension batch: câu ${batchInfo.start+i} thiếu passage/question`);
+        if (options.length !== 4 || answer < 0) throw new Error(`Reading comprehension batch: câu ${batchInfo.start+i} options/answer không hợp lệ`);
+        return {
+          text, question,
+          options: options.map(o => String(o?.text ?? o ?? '').trim()),
+          answer,
+          explanation: String(q?.explanation ?? '').trim(),
+          tested_word: String(q?.tested_word ?? '').trim()
+        };
+      });
+      return {part2_comprehension:normalized};
+    }
+
+    async function generateReadingBatch(level, batchInfo, targetVocab) {
+      const prompt = buildReadingBatchPrompt(level, batchInfo, targetVocab);
+
+      for (let repairAttempt = 0; repairAttempt < 2; repairAttempt++) {
+        const currentPrompt = repairAttempt === 0
+          ? prompt
+          : `${prompt}
+
+ĐÂY LÀ LẦN SỬA LÔ. Lần trước FAIL validation.
+Chỉ sửa lỗi số lượng/cấu trúc. Vẫn phải trả đúng ${batchInfo.count} object trong "questions".
+Tuyệt đối không bỏ passage, question_text, options hoặc correct_answer.`;
+
+        try {
+          const {data, model, keyIndex} = await runGeminiWithKeyPool({
+            models: MODEL_FALLBACK_CHAIN,
+            bodyFactory: activeModel => ({
+              contents:[{parts:[{text:EXAM_SYSTEM_PROMPT},{text:currentPrompt}]}],
+              generationConfig: buildExamGenerationConfig(activeModel, 10000, 0.15)
+            }),
+            onAttempt: ({model,keyIndex,keyCount}) => {
+              const btn=document.getElementById('generateExamBtn');
+              if(btn) btn.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> Reading ${batchInfo.start}-${batchInfo.end} · ${model} · API ${keyIndex+1}/${keyCount}`;
+              const badge=document.getElementById('headerModelBadge');
+              if(badge) badge.innerText=model;
+            }
+          });
+
+          const raw=data?.candidates?.[0]?.content?.parts?.find(p=>typeof p?.text==='string')?.text;
+          if(!raw) throw new Error(data?.error?.message || 'Reading: Gemini không trả JSON');
+          let parsed;
+          try {
+            parsed = JSON.parse(cleanJSONText(raw));
+          } catch (e) {
+            throw new Error(`Reading batch ${batchInfo.start}-${batchInfo.end}: JSON lỗi`);
+          }
+
+          const normalized = normalizeReadingBatchPayload(parsed, batchInfo);
+          return {normalized, model, keyIndex};
+        } catch (err) {
+          if (repairAttempt === 1) throw err;
+          console.warn('Reading batch retry:', batchInfo, err);
+        }
+      }
+      throw new Error('Reading batch thất bại.');
+    }
+
+    async function generateReadingExamRobust(level, targetVocab) {
+      const p = getOfficialExamPlan(level, 'Reading');
+      const total = p.skillTotal;
+
+      const part1Count = Math.min(10, total);
+      let cursor = 0;
+      const legacy = {
+        exam_metadata:{hsk_level:level, section:'Reading'},
+        listening:{part1_true_false:[],part2_dialogue:[]},
+        reading:{word_bank:[],part1_fill_blank:[],part2_comprehension:[]},
+        writing:{part1_reorder:[],part2_pinyin_to_hanzi:[]}
+      };
+
+      // Batches nhỏ: 10 cloze đầu, phần còn lại comprehension, mỗi batch tối đa 10.
+      if (part1Count > 0) {
+        const info=getReadingBatchPlan(level,cursor,part1Count,'cloze_test');
+        const batch=await generateReadingBatch(level,info,targetVocab);
+        legacy.reading.word_bank=batch.normalized.word_bank;
+        legacy.reading.part1_fill_blank.push(...batch.normalized.part1_fill_blank);
+        cursor=info.end;
+      }
+
+      while (cursor < total) {
+        const count=Math.min(READING_BATCH_SIZE,total-cursor);
+        const info=getReadingBatchPlan(level,cursor,count,'reading_comprehension');
+        const batch=await generateReadingBatch(level,info,targetVocab);
+        legacy.reading.part2_comprehension.push(...batch.normalized.part2_comprehension);
+        cursor=info.end;
+      }
+
+      const issues=validateLegacyExam(legacy,'Reading',total);
+      if(issues.length) throw new Error(`Reading cuối cùng vẫn không hợp lệ: ${issues.slice(0,8).join('; ')}`);
+
+      return legacy;
     }
 
     async function generateHSKExam(){
@@ -2897,6 +3181,14 @@ ${vocabList}`;
       const userPrompt=makeExamUserPrompt(level,skill,target);
       let lastIssue='';
       try{
+        // Reading dùng pipeline riêng: chia lô để không bị thiếu câu/passsage/question khi JSON dài.
+        if(skill==='Reading'){
+          currentExamData=await generateReadingExamRobust(level,target);
+          renderActiveExamUI(level);
+          console.info(`Reading robust pipeline hoàn tất: ${currentExamQuestionCount} câu`);
+          return;
+        }
+
         let candidate=null;
         for(let attempt=1; attempt<=3; attempt++){
           const prompt = attempt===1 ? userPrompt : `${userPrompt}\n\nĐÂY LÀ LẦN SỬA THỨ ${attempt-1}. Output trước đã FAIL kiểm tra với lỗi: ${lastIssue}. Không lặp lại lỗi; phải đủ đúng số câu và đủ passage/question cho Reading.`;
