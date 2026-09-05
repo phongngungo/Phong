@@ -893,6 +893,15 @@ Phân tích TOÀN BỘ danh sách từ vựng tiếng Trung mà người dùng c
 Với MỖI TỪ VỰNG, tạo đúng 1 object kết quả.
 Nếu người dùng nhập N từ thì kết quả phải là 1 JSON Array gồm N object tương ứng.
 
+QUY TRÌNH SUY LUẬN TẠO CÂU CHUYỆN (BẮT BUỘC):
+1. Bước 1 - TRA NGHĨA CHỮ ĐƠN (GROUNDING): Với MỖI chữ Hán cấu thành từ đầu vào, trước khi viết story phải xác định rõ Hán Việt và nghĩa thông dụng/cốt lõi của chính chữ đơn đó. Không được bỏ qua bước này dù đó là chữ đứng riêng hay nằm trong từ ghép.
+2. Bước 2 - CHIẾT TỰ CÓ Ý NGHĨA: Phân tích các thành phần/bộ thủ có ích cho ghi nhớ. Không bóc tách các nét vụn vô nghĩa như 丨, 丶 nếu chúng không giúp giải thích chữ; ưu tiên bộ/thành phần có hình ảnh hoặc ý nghĩa thực tế như 氵=nước, 扌=bàn tay/hành động, 犭=muông thú, 宀=mái nhà. Nếu một thành phần là ký hiệu cấu tạo chứ không có nghĩa độc lập rõ ràng, phải ghi trung thực và không bịa nghĩa.
+3. Bước 3 - QUY TẮC "MỎ NEO Ý NGHĨA" (ANCHOR TO MEANING): Story BẮT BUỘC phải giải thích hoặc dẫn dắt đến NGHĨA CỐT LÕI của chữ/từ. Không được viết một câu chuyện bâng quơ chỉ vì có thể nhắc tên bộ thủ. Người học phải nhìn vào story và hiểu vì sao hình ảnh/chiết tự dẫn tới nghĩa của chữ.
+4. Với CHỮ ĐƠN: Ghép hình ảnh các thành phần để dẫn trực tiếp đến nghĩa của chữ. Ví dụ 休: người 亻 tựa vào cây 木 → NGHỈ.
+5. Với TỪ GHÉP: Sau khi đã grounding từng chữ đơn, dùng nghĩa của các chữ đơn làm chất liệu chính để liên kết thành một cảnh logic, tự nhiên và giải thích được nghĩa của cả từ. Ví dụ 机场: 场 = bãi đất/sân rộng + 机 = máy móc/cỗ máy → bãi đất rộng nơi cỗ máy biết bay hoạt động/cất hạ cánh → SÂN BAY.
+6. Tuyệt đối KHÔNG hy sinh nghĩa cốt lõi chỉ để tạo câu chuyện vui tai. Nếu chiết tự lịch sử không hoàn toàn đồng nhất với nghĩa hiện đại, ưu tiên nói rõ đây là "mẹo ghi nhớ" thay vì khẳng định sai là nguồn gốc từ nguyên.
+7. Story nên ngắn, dễ hình dung, tự nhiên, có quan hệ nhân quả rõ ràng và kết thúc bằng nghĩa tiếng Việt cốt lõi của chữ/từ (có thể nhấn mạnh bằng CHỮ HOA).
+
 QUY TẮC JSON BẮT BUỘC:
 1. Chỉ được trả về DUY NHẤT 1 JSON Array hợp lệ.
 2. JSON phải bắt đầu bằng "[" và kết thúc bằng "]".
@@ -902,27 +911,42 @@ QUY TẮC JSON BẮT BUỘC:
 6. TUYỆT ĐỐI KHÔNG thêm lời giải thích, tiêu đề hoặc văn bản bên ngoài JSON.
 7. Mỗi từ đầu vào tương ứng với đúng 1 object trong Array.
 8. Không được bỏ sót từ, không gộp nhiều từ thành một object.
-9. Nếu một từ có nhiều nghĩa, vẫn chỉ tạo 1 object cho từ đó.
+9. Nếu một từ có nhiều nghĩa, vẫn chỉ tạo 1 object và chọn nghĩa thông dụng/cốt lõi phù hợp nhất với ví dụ.
 10. Tất cả key/value phải là JSON hợp lệ; chuỗi phải dùng dấu ngoặc kép.
+11. BẮT BUỘC có \`char_breakdown\` là Array, mỗi phần tử tương ứng 1 chữ Hán trong \`hanzi\`.
+12. \`story\` phải dựa trên \`char_breakdown\` và kiểm tra được bằng nghĩa của từng chữ đơn; không được kể chuyện chỉ dựa trên âm đọc hoặc tên bộ.
 
 SCHEMA:
 [
   {
-    "hanzi": "中国",
-    "pinyin": "Zhōngguó",
-    "hanviet": "Trung Quốc",
-    "hanviet_meaning": "Đất nước ở trung tâm",
-    "radicals": "• 中 (zhōng): Trung = Côn 丨 + Khẩu 口\n• 国 (guó): Quốc = Vi 囗 + Ngọc 玉",
-    "story": "Đâm trúng Trung tâm và dùng thành bao bọc Ngọc quý của một Quốc gia.",
-    "example_cn": "我喜欢中国菜。",
-    "example_pinyin": "Wǒ xǐhuan Zhōngguó cài.",
-    "example_vi": "Tôi thích món ăn Trung Quốc.",
+    "hanzi": "机场",
+    "pinyin": "jīchǎng",
+    "hanviet": "Cơ Trường",
+    "hanviet_meaning": "Sân bay",
+    "char_breakdown": [
+      {
+        "char": "机",
+        "hanviet": "Cơ",
+        "meaning": "Máy móc, cỗ máy",
+        "components": "木 (Mộc, gỗ/cấu trúc) + 几 (thành phần hình thể/bệ đỡ); đây là giải thích ghi nhớ, không khẳng định từ nguyên tuyệt đối"
+      },
+      {
+        "char": "场",
+        "hanviet": "Trường",
+        "meaning": "Bãi đất, sân rộng",
+        "components": "土 (Thổ, đất) + thành phần Dương trong chữ; gợi hình một không gian mở/bãi rộng"
+      }
+    ],
+    "story": "场 là BÃI ĐẤT/SÂN RỘNG; 机 là CỖ MÁY. Hãy hình dung một bãi đất rộng dành cho cỗ máy biết bay cất và hạ cánh → SÂN BAY.",
+    "example_cn": "我打车去机场。",
+    "example_pinyin": "Wǒ dǎchē qù jīchǎng.",
+    "example_vi": "Tôi bắt taxi đi sân bay.",
     "confusing_words": [
       {
-        "hanzi": "忠",
-        "pinyin": "zhōng",
-        "hanviet": "Trung",
-        "meaning_vi": "Trung thành, lòng trung",
+        "hanzi": "鸡场",
+        "pinyin": "jīchǎng",
+        "hanviet": "Kê Trường",
+        "meaning_vi": "trang trại/khu nuôi gà",
         "tag": "Đọc giống"
       }
     ]
@@ -934,6 +958,10 @@ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ:
 - Chỉ có 1 root JSON duy nhất.
 - Root bắt buộc là Array.
 - Không có bất kỳ ký tự hay nội dung nào nằm ngoài Array.
+- Với MỖI object: số phần tử \`char_breakdown\` phải bằng số chữ Hán trong \`hanzi\` (trừ trường hợp chữ ghép/biến thể không thể tách hợp lý, khi đó vẫn phải giải thích rõ).
+- MỖI \`char_breakdown[i].char\` phải là đúng chữ Hán tương ứng trong \`hanzi\`.
+- \`meaning\` của từng chữ đơn phải là nghĩa thực tế trước khi dùng làm nền cho \`story\`.
+- \`story\` phải có mối nối rõ ràng từ nghĩa chữ đơn → nghĩa của cả chữ/từ; nếu đọc story mà không đoán được nghĩa cốt lõi thì phải viết lại.
 
 Hãy tuân thủ tuyệt đối các quy tắc trên.`
 
@@ -3464,9 +3492,31 @@ Tuyệt đối không bỏ passage, question_text, options hoặc correct_answer
       updateCommunicationScopeUI();
     }
 
+    function formatCharBreakdownHTML(item) {
+      const list = Array.isArray(item?.char_breakdown) ? item.char_breakdown : [];
+      if (list.length) {
+        return list.map((part, index) => {
+          const char = part?.char || '';
+          const hanviet = part?.hanviet || '';
+          const meaning = part?.meaning || '';
+          const components = part?.components || '';
+          return `<div class="py-1.5 ${index ? 'border-t border-stone-200/70' : ''}">
+            <div class="flex items-baseline gap-2">
+              <span class="font-hanzi font-black text-lg text-stone-900">${char}</span>
+              <span class="font-bold text-stone-700">${hanviet}</span>
+              <span class="text-stone-500">— ${meaning}</span>
+            </div>
+            ${components ? `<div class="mt-0.5 pl-7 text-[10px] text-stone-500 leading-relaxed">${components}</div>` : ''}
+          </div>`;
+        }).join('');
+      }
+      return item?.radicals || '';
+    }
+
     function createCardHTML(item, isStaging = false) {
       const itemJSON = encodeURIComponent(JSON.stringify(item));
       const confusingCount = item.confusing_words ? item.confusing_words.length : 0;
+      const breakdownHTML = formatCharBreakdownHTML(item);
 
       return `
         <div class="bg-white rounded-2xl p-4 border border-stone-200 shadow-sm space-y-3">
@@ -3496,8 +3546,8 @@ Tuyệt đối không bỏ passage, question_text, options hoặc correct_answer
           </div>
 
           <div class="space-y-1.5 text-xs">
-            <div class="p-2.5 bg-stone-50 rounded-xl text-stone-700 leading-relaxed font-mono whitespace-pre-line text-[11px] border border-stone-100">
-              ${item.radicals}
+            <div class="p-2.5 bg-stone-50 rounded-xl text-stone-700 leading-relaxed text-[11px] border border-stone-100">
+              ${breakdownHTML}
             </div>
             <div class="p-2.5 bg-red-50/70 rounded-xl text-red-950 font-medium leading-relaxed text-[11px] border border-red-100 flex items-start gap-2">
               <i class="fa-solid fa-lightbulb text-red-500 mt-0.5"></i>
