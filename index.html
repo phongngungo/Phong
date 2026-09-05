@@ -3529,21 +3529,22 @@ Tuyệt đối không bỏ passage, question_text, options hoặc correct_answer
       const list = Array.isArray(item?.char_breakdown) ? item.char_breakdown : [];
       if (list.length) {
         return list.map((part, index) => {
-          const char = part?.char || '';
-          const hanviet = part?.hanviet || '';
-          const meaning = part?.meaning || '';
-          const components = part?.components || '';
+          const char = String(part?.char || '').trim();
+          const hanviet = String(part?.hanviet || '').trim();
+          const meaning = String(part?.meaning || '').trim();
+          const components = String(part?.components || '').trim();
           return `<div class="py-1.5 ${index ? 'border-t border-stone-200/70' : ''}">
             <div class="flex items-baseline gap-2">
-              <span class="font-hanzi font-black text-lg text-stone-900">${char}</span>
-              <span class="font-bold text-stone-700">${hanviet}</span>
-              <span class="text-stone-500">— ${meaning}</span>
+              <span class="font-hanzi font-black text-lg text-red-600">${escapeHTML(char)}</span>
+              <span class="font-bold text-stone-700">${escapeHTML(hanviet)}</span>
+              <span class="text-stone-500">— ${escapeHTML(meaning)}</span>
             </div>
-            ${components ? `<div class="mt-0.5 pl-7 text-[10px] text-stone-500 leading-relaxed">${components}</div>` : ''}
+            ${components ? `<div class="mt-0.5 pl-7 text-[10px] text-stone-500 leading-relaxed">${escapeHTML(components)}</div>` : ''}
           </div>`;
         }).join('');
       }
-      return item?.radicals || '';
+      const legacy = String(item?.radicals || '').trim();
+      return legacy ? escapeHTML(legacy).replace(/\n/g, '<br>') : '<span class="text-stone-400 italic">Chưa có dữ liệu chiết tự.</span>';
     }
 
     function createCardHTML(item, isStaging = false) {
