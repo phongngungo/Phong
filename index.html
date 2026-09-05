@@ -976,10 +976,13 @@ QUY CHUẨN BIÊN SOẠN:
 2. HSK 3-4: Tăng độ phức tạp, ưu tiên cấu trúc vì... nên, tuy... nhưng, 把/被 khi phù hợp; Reading có thể dài hơn và giảm Pinyin dần.
 3. HSK 5-6: Văn phong học thuật/thuyết minh/nghị luận, từ nối và thành ngữ 4 chữ khi phù hợp; bẫy logic phải có cơ sở.
 4. Distractor: tuyệt đối không ngớ ngẩn; ưu tiên từ cùng trường nghĩa nhưng sai kết hợp, từ gần nghĩa khác sắc thái, hoặc lỗi trật tự/ngữ pháp điển hình.
-5. Listening: mỗi câu phải có audio_script hoàn chỉnh, tự nhiên, đủ ngữ cảnh để TTS phát; có pinyin_script khi được yêu cầu hoặc cấp độ cần.
-6. Chỉ sử dụng vốn từ mục tiêu khi có thể. Có thể dùng từ chức năng/ngữ pháp tối thiểu để câu tự nhiên và đúng cấp độ, nhưng không lạm dụng từ ngoài danh sách.
-7. Tất cả correct_answer phải khớp chính xác với một option; không có câu mơ hồ.
-8. Phải trả về DUY NHẤT một JSON object hợp lệ. Không markdown. Không bình luận ngoài JSON.
+5. Listening: mỗi câu phải có nội dung nghe hoàn chỉnh, tự nhiên, đủ ngữ cảnh để TTS phát. Với câu hỏi lựa chọn có hội thoại, BẮT BUỘC trả thêm trường dialogue là mảng các lượt nói có speaker rõ ràng; audio_script là bản tương thích để app cũ vẫn đọc được.
+6. Listening Turn-taking & Distractor: HSK 1-2 dùng 1-2 lượt thoại ngắn; HSK 3-4 ưu tiên 2-4 lượt thoại và phải có ít nhất một chi tiết chuyển hướng hợp lý (thời gian, phủ định, thay đổi kế hoạch, thời tiết, địa điểm, người/đối tượng hoặc nguyên nhân-kết quả). Câu hỏi phải kiểm tra thông tin SAU khi xét chuyển hướng, không chỉ bắt từ khóa. Không biến mọi câu thành trò đánh đố; bẫy phải đến từ thông tin thật trong hội thoại.
+7. Chỉ sử dụng vốn từ mục tiêu khi có thể. Có thể dùng từ chức năng/ngữ pháp tối thiểu để câu tự nhiên và đúng cấp độ, nhưng không lạm dụng từ ngoài danh sách.
+8. Tất cả correct_answer phải khớp chính xác với một option; không có câu mơ hồ.
+9. Reading: không nhồi toàn bộ vốn từ mục tiêu vào một passage/question. Mỗi passage hoặc cụm câu chỉ nên dùng khoảng 2-4 từ mục tiêu làm trọng tâm; các từ còn lại chỉ dùng khi tự nhiên hoặc làm distractor. Ưu tiên tin nhắn, thông báo, email/công việc, nhật ký, đánh giá/dịch vụ hoặc ghi chú đời sống phù hợp cấp độ.
+10. Reading Cloze (选词填空): word_bank nên có ít nhất 2 từ cùng từ loại/trường nghĩa khi có thể, để người học phải dựa vào nghĩa và ngữ cảnh thay vì chỉ nhìn mẹo ngữ pháp. Distractor phải hợp lý. explanation phải nêu manh mối ngữ nghĩa/ngữ cảnh quyết định đáp án và dịch câu hoàn chỉnh.
+11. Phải trả về DUY NHẤT một JSON object hợp lệ. Không markdown. Không bình luận ngoài JSON.
 
 SCHEMA PHẢI TUÂN THỦ:
 {
@@ -1002,7 +1005,10 @@ SCHEMA PHẢI TUÂN THỦ:
           "questions": [
             {
               "id": 1,
-              "audio_script": "string nếu là Listening",
+              "audio_script": "string nếu là Listening; với dialogue_comprehension là bản nối các lượt thoại, vẫn giữ nhãn 男：/女： và có 问： cho câu hỏi khi cần",
+              "dialogue": [
+                {"speaker":"男|女|旁白|问","text":"..."}
+              ],
               "pinyin_script": "string nếu có",
               "question_text": "string nếu cần",
               "question": "string nếu cần",
@@ -2337,6 +2343,25 @@ KIỂM TRA TRƯỚC KHI TRẢ:
       return speakHanzi(text, { rate: 0.92, listening: true, naturalProsody: true });
     }
 
+    async function speakListeningDialogue(questionObj) {
+      const dialogue = Array.isArray(questionObj?.dialogue) ? questionObj.dialogue.filter(x => x && String(x.text || '').trim()) : [];
+      const fallback = String(questionObj?.audio_dialogue || '').trim();
+      if (!dialogue.length) return speakListening(fallback.replace(/\r?\n/g, ' '));
+      stopActiveChineseTTS();
+      for (let i = 0; i < dialogue.length; i++) {
+        const line = dialogue[i];
+        const speaker = String(line.speaker || '').trim();
+        const prefix = /^(男|女|旁白)$/u.test(speaker) ? `${speaker}：` : '';
+        await speakListening(`${prefix}${String(line.text || '').trim()}`);
+        if (i < dialogue.length - 1) await sleep(800);
+      }
+      const question = String(questionObj?.question || '').trim();
+      if (question) {
+        await sleep(1500);
+        await speakListening(`问：${question}`);
+      }
+    }
+
     async function speakHanzi(text, options = {}) {
       haptic();
       const cleanText = normalizeSpeechText(text);
@@ -2863,7 +2888,7 @@ KIỂM TRA TRƯỚC KHI TRẢ:
                 audio_text:q.audio_script||q.audio_text||'', statement:q.question_text||q.question||q.statement||'', answer:String(q.correct_answer||'').toUpperCase()==='TRUE'||q.correct_answer===true, explanation:q.explanation||'', tested_word:q.tested_word||''
               })));
               else legacy.listening.part2_dialogue.push(...qs.map(q=>({
-                audio_dialogue:q.audio_script||q.audio_dialogue||'', question:q.question_text||q.question||'', options:optionsToLegacy(q), answer:Math.max(0,(q.options||[]).findIndex(o=>String(o?.key||'').toUpperCase()===String(q.correct_answer||'').toUpperCase())), explanation:q.explanation||'', tested_word:q.tested_word||'', pinyin_script:q.pinyin_script||''
+                audio_dialogue:q.audio_script||q.audio_dialogue||'', dialogue:Array.isArray(q.dialogue)?q.dialogue.map(t=>({speaker:String(t?.speaker||'').trim(),text:String(t?.text||'').trim()})).filter(t=>t.text):[], question:q.question_text||q.question||'', options:optionsToLegacy(q), answer:Math.max(0,(q.options||[]).findIndex(o=>String(o?.key||'').toUpperCase()===String(q.correct_answer||'').toUpperCase())), explanation:q.explanation||'', tested_word:q.tested_word||'', pinyin_script:q.pinyin_script||''
               })));
             } else if(secName==='Reading'){
               if(type.includes('cloze')){
@@ -2926,6 +2951,8 @@ KIỂM TRA TRƯỚC KHI TRẢ:
       }
       for(const [i,q] of (l.part2_dialogue||[]).entries()){
         if(!q?.audio_dialogue) issues.push(`Listening MC ${i+1}: thiếu audio_script`);
+        if(Array.isArray(q?.dialogue) && q.dialogue.length && q.dialogue.some(t=>!t?.speaker||!t?.text)) issues.push(`Listening MC ${i+1}: dialogue có lượt nói không hợp lệ`);
+        if(!Array.isArray(q?.dialogue) || q.dialogue.length===0){ const audio=String(q?.audio_dialogue||''); if(!/男\s*[：:]|女\s*[：:]/.test(audio)) issues.push(`Listening MC ${i+1}: thiếu speaker 男/女 trong dialogue`); }
         if(!Array.isArray(q?.options)||q.options.length<2||q.options.length>4) issues.push(`Listening MC ${i+1}: options phải 2-4`);
         if(!Number.isInteger(Number(q?.answer))||Number(q.answer)<0||Number(q.answer)>=q.options.length) issues.push(`Listening MC ${i+1}: đáp án không hợp lệ`);
       }
@@ -2953,6 +2980,10 @@ KIỂM TRA TRƯỚC KHI TRẢ:
       return `Bạn là Trưởng ban Đề thi thuộc Trung tâm Hợp tác Giao lưu Ngôn ngữ và Giáo dục (CLEC), chuyên gia biên soạn đề thi Hán ngữ Quốc tế HSK 3.0.
 
 Tạo đề mô phỏng HSK 3.0 giống đề thi thật nhất có thể cho ${level}. HỆ THỐNG ĐÃ KHÓA SỐ CÂU, KHÔNG ĐƯỢC TỰ Ý THAY ĐỔI.
+
+QUY TẮC LISTENING BẮT BUỘC: Với dialogue_comprehension, trường dialogue phải là mảng lượt nói [{"speaker":"男","text":"..."},{"speaker":"女","text":"..."}] theo đúng thứ tự. HSK 1-2: 1-2 lượt ngắn; HSK 3-4: ưu tiên 2-4 lượt và phải có ít nhất một chi tiết chuyển hướng/đính chính/thay đổi kế hoạch hoặc mốc thời gian. Câu hỏi phải dựa vào kết luận sau cùng hoặc suy luận từ hội thoại, không chỉ tìm từ khóa lặp lại. Tạo distractor hợp lý từ thông tin đã xuất hiện trong hội thoại. audio_script phải được dựng từ dialogue và giữ nhãn 男：/女：, sau đó 问： nếu câu hỏi được đưa vào audio.
+
+QUY TẮC READING BẮT BUỘC: Mỗi passage/cụm câu chỉ chọn khoảng 2-4 từ mục tiêu làm trọng tâm. Không cố nhồi toàn bộ danh sách từ. Ưu tiên văn bản thực tế như tin nhắn, thông báo, email/công việc, nhật ký, đánh giá/dịch vụ hoặc ghi chú đời sống. Với 选词填空, word_bank phải có distractor hợp lý và khi có thể có ít nhất 2 từ cùng từ loại/trường nghĩa để người học phải hiểu ngữ cảnh. explanation phải chỉ rõ manh mối nghĩa/ngữ cảnh và dịch câu sau khi điền.
 - Kỹ năng: ${skill}
 - Tổng số câu: ${p.skillTotal}
 - Thời lượng mô phỏng: khoảng ${p.skillMinutes} phút${skill==='Full_Mock'?` (toàn bài ${p.minutes} phút)`:''}
@@ -3037,8 +3068,9 @@ ${vocabList}`;
 Cấp độ: ${level}
 Số câu lô này: ${batchInfo.count} câu, đánh số từ ${batchInfo.start} đến ${batchInfo.end}.
 Không được tạo thừa/thiếu câu.
+WORD COVERAGE BUDGET: Mỗi câu chỉ dùng khoảng 2-4 từ mục tiêu làm trọng tâm; không cố nhét toàn bộ danh sách vào một câu. Ngữ cảnh ưu tiên: tin nhắn, thông báo, email/công việc, nhật ký, đánh giá/dịch vụ hoặc tình huống đời sống phù hợp ${level}.
 Mỗi câu phải có sentence đầy đủ với một chỗ trống, word_bank dùng chung gồm đủ từ gây nhiễu hợp lý, và correct_answer tồn tại trong word_bank.
-Mỗi câu có explanation ngắn.
+Mỗi câu có explanation ngắn nhưng phải nêu manh mối ngữ nghĩa/ngữ cảnh quyết định đáp án và dịch câu hoàn chỉnh sang tiếng Việt. Word bank nên có ít nhất 2 từ cùng từ loại/trường nghĩa khi có thể, để người học phải đọc hiểu thay vì chỉ nhìn dấu hiệu ngữ pháp.
 Ưu tiên từ mục tiêu nhưng câu phải tự nhiên, đúng trình độ.
 Trả DUY NHẤT JSON object:
 {"word_bank":[{"key":"A","word":"..."}],"questions":[{"id":${batchInfo.start},"sentence":"... ___ ...","correct_answer":"A","correct_word":"...","explanation":"...","tested_word":"..."}]}
@@ -3052,6 +3084,7 @@ ${vocabList}`;
 Cấp độ: ${level}
 Số câu lô này: ${batchInfo.count} câu, đánh số từ ${batchInfo.start} đến ${batchInfo.end}.
 Không được tạo thừa/thiếu câu.
+WORD COVERAGE BUDGET: Mỗi passage/câu hỏi chỉ chọn khoảng 2-4 từ mục tiêu làm trọng tâm; không nhồi toàn bộ vốn từ vào passage. Ưu tiên văn bản thực tế có mục đích rõ ràng: tin nhắn, thông báo, email/công việc, nhật ký, đánh giá/dịch vụ hoặc ghi chú đời sống phù hợp ${level}.
 Mỗi object question BẮT BUỘC có:
 - passage: đoạn/câu đọc hoàn chỉnh, không rỗng.
 - question_text: câu hỏi hoàn chỉnh, không rỗng.
@@ -3331,7 +3364,7 @@ Tuyệt đối không bỏ passage, question_text, options hoặc correct_answer
       l1Container.innerHTML=l1.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+1}</span><button onclick="speakListening('${safeJS(q.audio_text)}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">Nhận định: "${escapeHTML(q.statement||'')}"</p><div class="flex gap-2"><label class="flex-1 flex items-center justify-center gap-1.5 p-2 bg-white rounded-lg border border-stone-200 text-xs font-bold"><input type="radio" name="l1_ans_${idx}" value="true"><span class="text-emerald-700">✓ Đúng</span></label><label class="flex-1 flex items-center justify-center gap-1.5 p-2 bg-white rounded-lg border border-stone-200 text-xs font-bold"><input type="radio" name="l1_ans_${idx}" value="false"><span class="text-rose-700">✗ Sai</span></label></div></div>`).join('');
 
       const l2Container=document.getElementById('listenPart2List');
-      l2Container.innerHTML=l2.map((q,idx)=>`<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+l1.length+1}</span><button onclick="speakListening('${safeJS(String(q.audio_dialogue||'').replace(/\\n/g,' '))}')" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">${escapeHTML(q.question||'')}</p><div class="space-y-1.5">${(q.options||[]).map((opt,oi)=>`<label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 text-xs"><input type="radio" name="l2_ans_${idx}" value="${oi}"><span>${escapeHTML(opt)}</span></label>`).join('')}</div></div>`).join('');
+      l2Container.innerHTML=l2.map((q,idx)=>{ const payload=encodeURIComponent(JSON.stringify(q)); return `<div class="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2.5"><div class="flex items-center justify-between"><span class="font-bold text-xs text-red-600">Câu ${idx+l1.length+1}</span><button onclick="speakListeningDialogue(JSON.parse(decodeURIComponent('${safeJS(payload)}')))" class="px-2.5 py-1 bg-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 shadow-sm"><i class="fa-solid fa-volume-high"></i> Nghe</button></div><p class="text-xs font-semibold text-stone-800">${escapeHTML(q.question||'')}</p><div class="space-y-1.5">${(q.options||[]).map((opt,oi)=>`<label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 text-xs"><input type="radio" name="l2_ans_${idx}" value="${oi}"><span>${escapeHTML(opt)}</span></label>`).join('')}</div></div>`; }).join('');
 
       const readingBank=currentExamData.reading.word_bank||[];
       document.getElementById('readingBankContainer').innerHTML=readingBank.length
