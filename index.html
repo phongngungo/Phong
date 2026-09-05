@@ -286,10 +286,23 @@
           </div>
           <span id="communicationSavedCount" class="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black whitespace-nowrap">0 câu đã lưu</span>
         </div>
-        <div class="bg-stone-50 border border-stone-200 rounded-xl p-3 text-[10px] text-stone-600 leading-relaxed">
-          <div class="font-bold text-stone-800 mb-1"><i class="fa-solid fa-bullseye text-red-600 mr-1"></i>Phạm vi tạo câu</div>
+        <div class="bg-stone-50 border border-stone-200 rounded-xl p-3 text-[10px] text-stone-600 leading-relaxed space-y-2">
+          <div class="font-bold text-stone-800"><i class="fa-solid fa-bullseye text-red-600 mr-1"></i>Phạm vi tạo câu</div>
           <div id="communicationCurrentScope">Theo toàn bộ kho từ vựng.</div>
-          <div class="mt-1 text-stone-400">AI ưu tiên dùng 2–4 từ mục tiêu trong mỗi câu và chú thích cấu trúc ngữ pháp đáng chú ý khi có.</div>
+          <div>
+            <label class="block text-[9px] font-bold text-stone-500 uppercase mb-1">Chủ đề thực chiến</label>
+            <select id="communicationTopicSelect" onchange="setCommunicationTopic(this.value)" class="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-2 text-[10px] font-semibold text-stone-700 outline-none focus:ring-2 focus:ring-red-500">
+              <option value="auto">🤖 AI tự gom ngữ cảnh</option>
+              <option value="eating">🍜 Ăn uống / Gọi món</option>
+              <option value="shopping">🛍️ Mua sắm / Mặc cả</option>
+              <option value="transport">🚕 Đi lại / Taxi</option>
+              <option value="school">🎓 Trường học</option>
+              <option value="work">💼 Công việc / Văn phòng</option>
+              <option value="social">💬 Xã giao / Tán gẫu</option>
+              <option value="daily">🏠 Sinh hoạt hằng ngày</option>
+            </select>
+          </div>
+          <div class="text-stone-400">AI tự lọc từ lệch chủ đề, ưu tiên cụm từ kết hợp thực tế và tạo mini-dialogue 2 lượt.</div>
         </div>
         <button onclick="generateCommunicationSentences()" id="communicationGenerateBtnMain" class="w-full py-3.5 bg-red-600 active:scale-98 text-white rounded-xl font-bold text-xs shadow-md shadow-red-200 flex items-center justify-center gap-2 transition">
           <i class="fa-solid fa-wand-magic-sparkles"></i> Tạo 5 câu giao tiếp từ kho hiện tại
@@ -1177,53 +1190,50 @@ SCHEMA PHẢI TUÂN THỦ:
       'gemini-2.5-flash'
     ];
 
-    const COMMUNICATION_SYSTEM_PROMPT = `Bạn là chuyên gia huấn luyện khẩu ngữ tiếng Trung, chuyên giúp người học ghi nhớ và sử dụng từ vựng trong giao tiếp đời sống thực tế (HSK 1 - HSK 6).
+    const COMMUNICATION_SYSTEM_PROMPT = `Bạn là huấn luyện viên khẩu ngữ tiếng Trung thực chiến (Spoken Mandarin Coach), chuyên giúp người học HSK 1-6 phản xạ giao tiếp đời sống tự nhiên.
 
 NHIỆM VỤ:
-Dựa vào danh sách từ vựng tiếng Trung người học cung cấp, hãy ghép chúng thành các câu giao tiếp THỰC TẾ, TỰ NHIÊN, DỄ HIỂU và DỄ HỌC. Ưu tiên những câu mà người bản xứ thực sự thường nói trong đời sống hằng ngày, tuyệt đối tránh những câu văn vẻ, học thuật, kỳ lạ hoặc ít gặp chỉ để cố nhét từ vựng.
+Dựa vào kho từ vựng được cung cấp, hãy tạo đúng 5 MINI-DIALOGUE ngắn, mỗi mẫu gồm lượt A nói và lượt B phản xạ đáp lại. Mục tiêu là để người học vừa học câu vừa biết cách đáp trong tình huống thật.
 
-NGUYÊN TẮC QUAN TRỌNG NHẤT:
-1. Ưu tiên khẩu ngữ thông dụng, câu ngắn-vừa, tự nhiên và có tính ứng dụng cao.
-2. Ưu tiên các tình huống người học dễ gặp: Chào hỏi, Giới thiệu bản thân, Trường học, Công việc, Gia đình, Ăn uống, Mua sắm, Đi lại/Hỏi đường, Thời gian/Lịch hẹn, Sinh hoạt hằng ngày, Gọi điện/Nhắn tin, Bạn bè/Giao tiếp xã hội, Du lịch, Sức khỏe cơ bản.
-3. Không cố dùng từ mục tiêu nếu việc đưa từ đó vào khiến câu gượng ép. Thà dùng ít từ mục tiêu nhưng câu thật tự nhiên còn hơn nhồi nhiều từ.
-4. Mỗi câu nên kết hợp khéo léo nhiều từ vựng mục tiêu khi có thể (thường 2-4 từ), nhưng tính tự nhiên luôn được ưu tiên cao hơn số lượng từ.
-5. Ưu tiên mẫu câu và cấu trúc người học có thể tái sử dụng nhiều lần trong đời sống như: 你叫什么名字？、你住在哪里？、你有没有时间？、我想……、我觉得……、可以……吗？、要不要……？、怎么……？、为什么……？、因为……所以……、如果……就……、已经……了、正在……、一起……、先……再…… 等 khi phù hợp trình độ.
-6. Không tạo tình huống quá đặc biệt, quá kịch tính, quá văn chương, thành ngữ khó hoặc cách nói hiếm gặp nếu không thực sự cần thiết.
-7. Độ khó phải phù hợp trình độ của từ vựng. Với từ HSK thấp, câu phải đơn giản; không dùng hàng loạt từ ngoài danh sách ở mức cao làm câu khó học.
-8. Khi ghép nhiều từ, phải tạo thành một câu hoàn chỉnh có ngữ cảnh rõ ràng, giống câu người học có thể lập tức đem ra nói.
-9. Phân loại từng câu theo một chủ đề/ngữ cảnh đời sống rõ ràng.
-10. Nếu một từ có nhiều cách dùng, ưu tiên cách dùng phổ biến nhất trong giao tiếp hằng ngày.
+QUY TẮC BẮT BUỘC:
+1. TÍNH KHẨU NGỮ CAO: câu phải giống lời nói thực tế của người bản xứ ngoài đời. Có thể dùng trợ từ/thán từ tự nhiên như 吧、呢、啊、呀、哎、哎呀、诶、对吧、行、好嘞... khi phù hợp, nhưng không lạm dụng. Tuyệt đối tránh văn viết/formal như 在……之下、从而、进而 nếu không thực sự cần.
+2. MINI-DIALOGUE: mỗi mẫu phải có \`dialogue\` gồm đúng 2 lượt ngắn: A nói trước, B phản xạ đáp lại. Hai lượt phải liên quan chặt chẽ, không phải hai câu độc lập.
+3. PHẢN XẠ THẬT: response_preview phải là câu người nghe thực tế có thể đáp lại ngay, tự nhiên và phù hợp ngữ cảnh.
+4. KHÔNG NHỒI TỪ: chỉ sử dụng những từ mục tiêu thực sự ăn khớp trong cùng tình huống. Từ lệch chủ đề phải bỏ qua, tuyệt đối không cưỡng ép nhét vào chỉ để tăng coverage.
+5. TOPIC FIT: nếu người dùng chỉ định chủ đề, ưu tiên tuyệt đối chủ đề đó. Nếu để AI tự gom, hãy tự nhóm các từ mục tiêu có khả năng cùng xuất hiện trong một tình huống cụ thể rồi mới viết hội thoại.
+6. COLLOCATION: ưu tiên các cụm kết hợp quen thuộc của người bản xứ, ví dụ 买单、打包、打车、迟到了、没关系、真的假的... khi phù hợp. Không tạo collocation lạ.
+7. KHÔNG DÙNG TỪ KHÓ GƯỢNG ÉP: với vốn từ HSK thấp, giữ câu ngắn và dễ bắt chước; chỉ dùng từ ngoài danh sách ở mức tối thiểu để câu đúng ngữ pháp.
+8. MỖI MẪU CHỈ NÊN CÓ 1 TÌNH HUỐNG rõ ràng; người học nhìn vào phải hiểu ngay đang nói ở đâu và vì sao B đáp như vậy.
+9. Không cần dùng hết kho. Chất lượng hội thoại và khả năng tái sử dụng quan trọng hơn số lượng từ mục tiêu.
+10. target_words_used chỉ ghi đúng những từ mục tiêu thực sự xuất hiện trong dialogue.
 
-ĐỊNH DẠNG NỘI DUNG MỖI CÂU:
-- Chữ Hán: câu tiếng Trung Giản thể, trình bày nổi bật/in đậm ở giao diện.
-- Pinyin: phiên âm Hanyu Pinyin có dấu thanh chuẩn.
-- Dịch nghĩa: tiếng Việt tự nhiên, dễ hiểu, không dịch word-by-word.
-- Từ vựng mục tiêu: ghi rõ các từ trong danh sách đã được lồng ghép, theo dạng “Từ vựng: …”.
-
-YÊU CẦU ĐẦU RA CHO APP:
-Ứng dụng hiện đang xử lý kết quả bằng JSON, vì vậy KHÔNG được trả về markdown/bullet hay văn bản ngoài JSON. Hãy trả về DUY NHẤT một JSON Array hợp lệ, mỗi object là một câu giao tiếp, với schema:
+SCHEMA BẮT BUỘC:
 [
   {
-    "scenario": "Chủ đề/ngữ cảnh đời sống, ví dụ: Ăn uống / Mua sắm / Trường học",
-    "hanzi": "Câu tiếng Trung Giản thể tự nhiên, thông dụng",
-    "pinyin": "Pinyin có dấu thanh chuẩn",
-    "meaning_vi": "Dịch nghĩa tiếng Việt tự nhiên",
-    "target_words_used": ["từ mục tiêu 1", "từ mục tiêu 2"],
-    "practical_tip": "Mẹo dùng câu trong giao tiếp; ngắn gọn, thiết thực. Nếu không cần thì ghi —",
-    "grammar_note": "Chú thích cấu trúc đáng nhớ; chỉ ghi cấu trúc thực sự hữu ích. Nếu không có thì ghi —"
+    "scenario": "Ăn uống / Quán ăn",
+    "dialogue": [
+      {"speaker":"A","text":"服务员，买单！"},
+      {"speaker":"B","text":"好嘞，请问扫码还是现金？"}
+    ],
+    "hanzi": "服务员，买单！",
+    "pinyin": "Fúwùyuán, mǎidān!",
+    "meaning_vi": "Phục vụ ơi, tính tiền!",
+    "response_preview": "好嘞，请问扫码还是现金？ · Dạ được, bạn quét mã hay trả tiền mặt?",
+    "target_words_used": ["买单"],
+    "collocation_oral": "买单 = tính tiền; 好嘞 = cách đáp rất khẩu ngữ",
+    "practical_tip": "Nói ngắn, dứt khoát; 好嘞 là cách đáp thân thiện, tự nhiên.",
+    "grammar_note": "—"
   }
 ]
 
-KIỂM TRA TRƯỚC KHI TRẢ:
-- Đúng số lượng câu được yêu cầu.
-- Mỗi câu phải là một câu giao tiếp hoàn chỉnh, tự nhiên và dễ học.
-- Không có câu kỳ lạ chỉ vì cố sử dụng từ mục tiêu.
-- Pinyin chính xác.
-- Dịch tiếng Việt tự nhiên.
-- scenario phải phản ánh đúng ngữ cảnh câu.
-- target_words_used chỉ chứa những từ thực sự xuất hiện trong câu.
-- Không có markdown, không có lời giải thích ngoài JSON.`;
-
+YÊU CẦU OUTPUT:
+- Trả về DUY NHẤT JSON Array hợp lệ gồm đúng 5 object.
+- Không markdown, không lời giải thích ngoài JSON.
+- dialogue bắt buộc có đúng 2 lượt, speaker chỉ dùng A/B, text không rỗng.
+- hanzi là lượt A; response_preview phản ánh lượt B.
+- Pinyin phải có dấu thanh chuẩn.
+- Không tạo câu kỳ lạ chỉ để nhét từ.
+- Nếu một từ không hợp chủ đề, bỏ qua nó.`;
     const COMMUNICATION_MODEL_FALLBACK_CHAIN = [
       'gemini-3.7-flash',
       'gemini-3.6-flash',
@@ -1241,6 +1251,8 @@ KIỂM TRA TRƯỚC KHI TRẢ:
     let categories = JSON.parse(localStorage.getItem('hn_categories') || '["HSK 1 Bài 1", "HSK 1 Bài 2", "HSK 1 Bài 3"]');
     let communicationGenerated = [];
     let communicationSaved = JSON.parse(localStorage.getItem('hn_communication_saved_v1') || '[]');
+    let communicationTopic = localStorage.getItem('hn_communication_topic_v1') || 'auto';
+    let communicationShadowState = {recorder:null, stream:null, chunks:[], recognition:null, transcript:'', audioUrl:null, target:'', recording:false};
 
     // Exam State
     let currentExamData = null;
@@ -1305,24 +1317,56 @@ KIỂM TRA TRƯỚC KHI TRẢ:
 
     /* ================= KHẨU NGỮ THỰC CHIẾN TỪ KHO TỪ ================= */
     function shuffleArray(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
-    function updateCommunicationScopeUI(){const scope=currentFilter==='ALL'?'Theo toàn bộ kho từ vựng.':`Theo thư mục: ${currentFilter}`;const banner=document.getElementById('communicationScopeLabel');const panel=document.getElementById('communicationCurrentScope');if(banner)banner.innerText=currentFilter==='ALL'?'Theo toàn bộ kho':`Theo: ${currentFilter}`;if(panel)panel.innerText=scope;}
+    const COMMUNICATION_TOPIC_LABELS={auto:'AI tự gom ngữ cảnh',eating:'Ăn uống / Gọi món',shopping:'Mua sắm / Mặc cả',transport:'Đi lại / Taxi',school:'Trường học',work:'Công việc / Văn phòng',social:'Xã giao / Tán gẫu',daily:'Sinh hoạt hằng ngày'};
+    const COMMUNICATION_TOPIC_HINTS={
+      eating:['吃','喝','饭','菜','餐','杯','茶','咖啡','买单','打包','菜单','服务员','便宜','钱','饿','渴','味道'],
+      shopping:['买','卖','钱','价格','便宜','贵','衣服','裤子','鞋','颜色','试','喜欢','商店','超市','购物'],
+      transport:['车','打车','出租车','地铁','公交','站','机场','火车','路','去','到','远','近','堵车','司机'],
+      school:['学校','老师','学生','上课','下课','考试','作业','教室','同学','学习','书','中文'],
+      work:['工作','公司','办公室','老板','同事','会议','项目','客户','邮件','加班','上班','下班'],
+      social:['朋友','你好','谢谢','聊天','认识','见面','一起','喜欢','觉得','真的','当然','没关系','怎么了'],
+      daily:['家','起床','睡觉','今天','明天','昨天','时间','吃','喝','看','做','准备','一起','已经','现在','习惯']
+    };
+    function setCommunicationTopic(topic){communicationTopic=COMMUNICATION_TOPIC_LABELS[topic]?topic:'auto';localStorage.setItem('hn_communication_topic_v1',communicationTopic);updateCommunicationScopeUI();}
+    function updateCommunicationScopeUI(){const scope=currentFilter==='ALL'?'Theo toàn bộ kho từ vựng.':`Theo thư mục: ${currentFilter}`;const banner=document.getElementById('communicationScopeLabel');const panel=document.getElementById('communicationCurrentScope');if(banner)banner.innerText=currentFilter==='ALL'?'Theo toàn bộ kho':`Theo: ${currentFilter}`;if(panel)panel.innerText=`${scope} · Chủ đề: ${COMMUNICATION_TOPIC_LABELS[communicationTopic]||COMMUNICATION_TOPIC_LABELS.auto}`;const sel=document.getElementById('communicationTopicSelect');if(sel&&sel.value!==communicationTopic)sel.value=communicationTopic;}
+    function communicationTopicScore(v,topic){if(topic==='auto')return 0;const hints=COMMUNICATION_TOPIC_HINTS[topic]||[];const text=`${v?.hanzi||''} ${v?.meaning||''} ${v?.category||''}`.toLowerCase();return hints.reduce((n,h)=>n+(text.includes(String(h).toLowerCase())?1:0),0);}
+    function selectCommunicationCandidates(source){const pool=source.map(v=>({v,score:communicationTopicScore(v,communicationTopic)}));if(communicationTopic!=='auto'&&pool.some(x=>x.score>0))return pool.sort((a,b)=>b.score-a.score||Math.random()-.5).slice(0,18).map(x=>x.v);const byCategory=new Map();for(const x of shuffleArray(pool)){const key=String(x.v.category||'Chưa phân loại');if(!byCategory.has(key))byCategory.set(key,[]);if(byCategory.get(key).length<4)byCategory.get(key).push(x.v);}return [...byCategory.values()].flat().slice(0,18);}
+    function normalizeCommunicationTarget(text){return String(text||'').replace(/[\s，。！？、,.!?；;：“”"'()（）！？…—–-]/g,'').trim();}
+    function communicationSimilarity(expected,got){const a=[...normalizeCommunicationTarget(expected)],b=[...normalizeCommunicationTarget(got)];if(!a.length||!b.length)return 0;const m=a.length,n=b.length;const dp=Array.from({length:m+1},()=>new Uint16Array(n+1));for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]+1:Math.max(dp[i-1][j],dp[i][j-1]);return Math.max(0,Math.min(100,Math.round(dp[m][n]/m*100)));}
+    function stopCommunicationAudio(){try{window.speechSynthesis.cancel();}catch(_){}try{if(communicationShadowState.recorder?.state==='recording')communicationShadowState.recorder.stop();}catch(_){}communicationShadowState.stream?.getTracks?.().forEach(t=>t.stop());communicationShadowState.stream=null;if(communicationShadowState.recognition){try{communicationShadowState.recognition.stop();}catch(_){}communicationShadowState.recognition=null;}}
+    function startCommunicationRecognition(expected){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return false;try{const rec=new SR();rec.lang='zh-CN';rec.continuous=true;rec.interimResults=true;let parts=[];rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){const t=e.results[i][0]?.transcript||'';if(t)parts.push(t);}}communicationShadowState.transcript=parts.join(' ').trim();};rec.onend=()=>{communicationShadowState.recognition=null;};rec.onerror=()=>{};rec.start();communicationShadowState.recognition=rec;return true;}catch(_){communicationShadowState.recognition=null;return false;}}
+    async function startCommunicationShadowing(index,saved=false){const item=saved?communicationSaved[index]:communicationGenerated[index];if(!item)return;const target=String(item?.hanzi||'').trim();if(!target)return;haptic();stopCommunicationAudio();communicationShadowState.target=target;communicationShadowState.transcript='';communicationShadowState.chunks=[];communicationShadowState.recording=false;const prefix=saved?'saved':'generated';const status=document.getElementById(`commShadowStatus_${prefix}_${index}`);const playback=document.getElementById(`commShadowPlayback_${prefix}_${index}`);const score=document.getElementById(`commShadowScore_${prefix}_${index}`);
+      try{if(window.Native?.call){const ready=await new Promise(resolve=>{try{window.Native.call('permissions',{action:'CHECK_PERMISSION',payload:{permission:'AUDIO'}},raw=>{let r=raw;try{if(typeof raw==='string')r=JSON.parse(raw)}catch(_){}resolve(r||{});});}catch(_){resolve({})}});if(ready?.params?.permissionStatus!=='GRANTED'){const asked=await new Promise(resolve=>{try{window.Native.call('permissions',{action:'ASK_FOR_PERMISSION',payload:{permission:'AUDIO'}},raw=>{let r=raw;try{if(typeof raw==='string')r=JSON.parse(raw)}catch(_){}resolve(r||{});});}catch(_){resolve({})}});if(asked?.params?.permissionStatus!=='GRANTED'){alert('Ứng dụng chưa được cấp quyền microphone.');return;}}}
+        if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('Thiết bị/WebView không hỗ trợ ghi âm.');
+        communicationShadowState.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},video:false});
+        const preferred=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];let mime='';for(const m of preferred){try{if(MediaRecorder.isTypeSupported?.(m)){mime=m;break;}}catch(_){} }
+        const recorder=mime?new MediaRecorder(communicationShadowState.stream,{mimeType:mime}):new MediaRecorder(communicationShadowState.stream);communicationShadowState.recorder=recorder;communicationShadowState.recording=true;startCommunicationRecognition(target);
+        recorder.ondataavailable=e=>{if(e.data?.size)communicationShadowState.chunks.push(e.data);};recorder.onstop=()=>{const type=recorder.mimeType||mime||'audio/webm';const blob=new Blob(communicationShadowState.chunks,{type});if(communicationShadowState.audioUrl)URL.revokeObjectURL(communicationShadowState.audioUrl);communicationShadowState.audioUrl=URL.createObjectURL(blob);if(playback){playback.src=communicationShadowState.audioUrl;playback.classList.remove('hidden');playback.load();}communicationShadowState.recording=false;const got=communicationShadowState.transcript||'';const pct=communicationSimilarity(target,got);if(status)status.innerText='Đã thu âm';if(score)score.innerHTML=got?`<span class="text-emerald-700 font-bold">Độ khớp ${pct}%</span> · ${escapeHTML(got)}`:'<span class="text-stone-500">Chưa có transcript tự động; bạn vẫn có thể nghe bản ghi.</span>';communicationShadowState.stream?.getTracks?.().forEach(t=>t.stop());communicationShadowState.stream=null;communicationShadowState.chunks=[];communicationShadowState.recorder=null;try{communicationShadowState.recognition?.stop();}catch(_){}communicationShadowState.recognition=null;recordPracticeEvent({mode:'communication-shadowing',score:got?pct:null,target});if(got&&pct<70)recordLearningError('Khẩu ngữ Shadowing',target,got,`Độ khớp ${pct}%`,{score:pct});};
+        recorder.start(250);if(status)status.innerText='Đang ghi âm… Đọc câu mẫu';
+      }catch(e){communicationShadowState.stream?.getTracks?.().forEach(t=>t.stop());communicationShadowState.stream=null;communicationShadowState.recorder=null;communicationShadowState.recording=false;alert('Không thể ghi âm: '+(e?.message||'Microphone chưa sẵn sàng.'));}
+    }
+    function stopCommunicationShadowing(){if(communicationShadowState.recorder?.state==='recording')communicationShadowState.recorder.stop();else stopCommunicationAudio();}
     function parseCommunicationJSON(raw){let text=String(raw||'').trim();if(text.startsWith('```'))text=text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();const start=text.indexOf('['),end=text.lastIndexOf(']');if(start>=0&&end>start)text=text.slice(start,end+1);return JSON.parse(text);}
     async function generateCommunicationSentences(){
       haptic();if(!hasGeminiApiKeys()){alert('Vui lòng thêm ít nhất 1 Gemini API Key tại tab Cài đặt.');switchTab('settings');return;}
       const source=currentFilter==='ALL'?vocabStore:vocabStore.filter(v=>v.category===currentFilter);if(!source.length){alert('Kho từ vựng hiện tại đang trống.');return;}
-      const picked=shuffleArray(source).slice(0,18).map(v=>({hanzi:v.hanzi,pinyin:v.pinyin,meaning:v.hanviet_meaning||v.example_vi||'',category:v.category||''}));
-      const prompt=`Dựa vào danh sách từ vựng dưới đây, hãy tạo đúng 5 câu giao tiếp thực tế, tự nhiên và dễ học. Ưu tiên các tình huống đời sống quen thuộc như chào hỏi, trường học, công việc, gia đình, ăn uống, mua sắm, đi lại, thời gian, sinh hoạt hằng ngày và giao tiếp với bạn bè. Không tạo câu lạ, văn vẻ, học thuật hoặc gượng ép chỉ để nhồi từ. Mỗi câu nên dùng khoảng 2-4 từ mục tiêu khi có thể, nhưng tự nhiên quan trọng hơn số lượng. Phân loại câu theo chủ đề/ngữ cảnh. Pinyin phải có dấu chuẩn, nghĩa tiếng Việt phải tự nhiên, và target_words_used chỉ ghi các từ thực sự xuất hiện trong câu.\n\nDAN SÁCH TỪ VỰNG:\n${JSON.stringify(picked,null,2)}`;
+      const picked=selectCommunicationCandidates(source).map(v=>({hanzi:v.hanzi,pinyin:v.pinyin,meaning:v.hanviet_meaning||v.example_vi||'',category:v.category||''}));
+      const topicLabel=COMMUNICATION_TOPIC_LABELS[communicationTopic]||COMMUNICATION_TOPIC_LABELS.auto;
+      const prompt=`Tạo đúng 5 MINI-DIALOGUE theo quy tắc hệ thống. Chủ đề ưu tiên: ${topicLabel}. Nếu danh sách có từ không hợp chủ đề thì bỏ qua, không nhồi. Trước khi viết từng mẫu, hãy tự lọc những từ có thể cùng xuất hiện tự nhiên trong một tình huống. Mỗi mẫu phải có 2 lượt A/B, trong đó hanzi chính là lượt A và response_preview phản ánh lượt B.\n\nDANH SÁCH TỪ VỰNG ĐƯỢC PHÉP CHỌN:\n${JSON.stringify(picked,null,2)}`;
       const buttons=[document.getElementById('communicationGenerateBtn'),document.getElementById('communicationGenerateBtnMain')].filter(Boolean);buttons.forEach(b=>{b.disabled=true;b.dataset.oldHtml=b.innerHTML;});
-      try{const {data,model,keyIndex}=await runGeminiWithKeyPool({models:COMMUNICATION_MODEL_FALLBACK_CHAIN,bodyFactory:()=>({contents:[{parts:[{text:COMMUNICATION_SYSTEM_PROMPT},{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.8}}),onAttempt:({model,keyIndex,keyCount})=>buttons.forEach(b=>b.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}`)});const raw=data?.candidates?.[0]?.content?.parts?.find(x=>typeof x?.text==='string')?.text;if(!raw)throw new Error(data?.error?.message||'AI không trả về dữ liệu câu giao tiếp.');const arr=parseCommunicationJSON(raw);if(!Array.isArray(arr)||!arr.length)throw new Error('Kết quả AI không phải JSON Array hợp lệ.');communicationGenerated=arr.slice(0,5).map(x=>({scenario:String(x?.scenario||'Giao tiếp đời sống'),hanzi:String(x?.hanzi||'').trim(),pinyin:String(x?.pinyin||'').trim(),meaning_vi:String(x?.meaning_vi||'').trim(),target_words_used:Array.isArray(x?.target_words_used)?x.target_words_used.map(String).slice(0,6):[],practical_tip:String(x?.practical_tip||'').trim(),grammar_note:String(x?.grammar_note||'—').trim()||'—'})).filter(x=>x.hanzi);if(!communicationGenerated.length)throw new Error('AI không tạo được câu hợp lệ.');renderCommunicationGenerated();openCommunicationModal();console.info(`Communication dùng ${model}, API ${keyIndex+1}`);}catch(e){alert(`Không thể tạo mẫu câu giao tiếp.\nChi tiết: ${e?.message||e}`);}finally{buttons.forEach(b=>{b.disabled=false;b.innerHTML=b.dataset.oldHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i> Tạo 5 câu giao tiếp';});}
+      try{const {data,model,keyIndex}=await runGeminiWithKeyPool({models:COMMUNICATION_MODEL_FALLBACK_CHAIN,bodyFactory:()=>({contents:[{parts:[{text:COMMUNICATION_SYSTEM_PROMPT},{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.8}}),onAttempt:({model,keyIndex,keyCount})=>buttons.forEach(b=>b.innerHTML=`<i class="fa-solid fa-circle-notch fa-spin"></i> ${model} · API ${keyIndex+1}/${keyCount}`)});const raw=data?.candidates?.[0]?.content?.parts?.find(x=>typeof x?.text==='string')?.text;if(!raw)throw new Error(data?.error?.message||'AI không trả về dữ liệu câu giao tiếp.');const arr=parseCommunicationJSON(raw);if(!Array.isArray(arr)||!arr.length)throw new Error('Kết quả AI không phải JSON Array hợp lệ.');communicationGenerated=arr.slice(0,5).map(x=>{const dialog=Array.isArray(x?.dialogue)?x.dialogue.slice(0,2).map(d=>({speaker:String(d?.speaker||'A').trim()==='B'?'B':'A',text:String(d?.text||'').trim()})).filter(d=>d.text):[];const a=dialog.find(d=>d.speaker==='A')?.text||String(x?.hanzi||'').trim();const b=dialog.find(d=>d.speaker==='B')?.text||String(x?.response_preview||'').split('·')[0].trim();return{scenario:String(x?.scenario||'Giao tiếp đời sống'),dialogue:[{speaker:'A',text:a},{speaker:'B',text:b}],hanzi:a,pinyin:String(x?.pinyin||'').trim(),meaning_vi:String(x?.meaning_vi||'').trim(),response_preview:String(x?.response_preview||b).trim(),target_words_used:Array.isArray(x?.target_words_used)?x.target_words_used.map(String).slice(0,6):[],collocation_oral:String(x?.collocation_oral||'').trim(),practical_tip:String(x?.practical_tip||'').trim(),grammar_note:String(x?.grammar_note||'—').trim()||'—'};}).filter(x=>x.hanzi&&x.dialogue[1].text);if(communicationGenerated.length<5)throw new Error(`AI chỉ tạo được ${communicationGenerated.length}/5 hội thoại hợp lệ.`);renderCommunicationGenerated();openCommunicationModal();console.info(`Communication mini-dialogue dùng ${model}, API ${keyIndex+1}`);}catch(e){alert(`Không thể tạo mẫu câu giao tiếp.\nChi tiết: ${e?.message||e}`);}finally{buttons.forEach(b=>{b.disabled=false;b.innerHTML=b.dataset.oldHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i> Tạo 5 câu giao tiếp';});}
     }
-    function communicationCardHTML(item,{saved=false,index=-1}={}){const words=(item.target_words_used||[]).map(w=>`<span class="px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[9px] font-bold">${escapeHTML(w)}</span>`).join('');const key=safeJS(item.hanzi+'|'+item.pinyin);const speech=safeJS(item.hanzi);const action=saved?`<button onclick="deleteCommunicationSentence('${key}')" class="w-8 h-8 rounded-full bg-stone-100 text-stone-400 hover:text-red-600 flex items-center justify-center active:scale-90 shrink-0" title="Xóa câu"><i class="fa-solid fa-trash-can text-xs"></i></button>`:`<button onclick="saveCommunicationSentence(${index})" class="px-2.5 py-1.5 rounded-lg bg-red-600 text-white text-[10px] font-bold active:scale-95"><i class="fa-solid fa-bookmark mr-1"></i>Lưu câu</button>`;return `<article class="bg-white rounded-2xl border border-stone-200 shadow-sm p-3.5 space-y-3"><div class="flex items-start justify-between gap-2"><span class="px-2.5 py-1 rounded-full bg-stone-100 text-stone-600 text-[9px] font-black uppercase tracking-wide">${escapeHTML(item.scenario||'Đời sống')}</span>${action}</div><div><div class="flex items-start gap-2"><button onclick="speakHanzi('${speech}')" class="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:scale-90 shrink-0" title="Nghe phát âm"><i class="fa-solid fa-volume-high text-xs"></i></button><div class="min-w-0 flex-1"><div class="font-hanzi font-bold text-stone-900 text-base leading-relaxed break-words">${escapeHTML(item.hanzi)}</div><div class="text-[11px] text-red-600 font-mono font-bold mt-1">${escapeHTML(item.pinyin)}</div></div></div><div class="mt-2 text-xs font-semibold text-stone-700 leading-relaxed">${escapeHTML(item.meaning_vi)}</div></div>${words?`<div><div class="text-[9px] font-bold text-stone-400 uppercase mb-1.5">Từ mục tiêu đã áp dụng</div><div class="flex flex-wrap gap-1.5">${words}</div></div>`:''}<div class="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 p-2.5 text-[10px] text-amber-900 leading-relaxed"><div class="font-bold mb-0.5"><i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> Cấu trúc / mẹo bỏ túi</div><div>${escapeHTML(item.grammar_note||'—')}</div>${item.practical_tip?`<div class="mt-1.5 pt-1.5 border-t border-dashed border-amber-200"><span class="font-bold">Mẹo nói:</span> ${escapeHTML(item.practical_tip)}</div>`:''}</div></article>`;}
+    function communicationCardHTML(item,{saved=false,index=-1}={}){const words=(item.target_words_used||[]).map(w=>`<span class="px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[9px] font-bold">${escapeHTML(w)}</span>`).join('');const key=safeJS((item.hanzi||'')+'|'+(item.pinyin||''));const prefix=saved?'saved':'generated';const speech=safeJS(item.hanzi||'');const response=(Array.isArray(item.dialogue)?item.dialogue.find(d=>d.speaker==='B')?.text:'')||String(item.response_preview||'').split('·')[0].trim();const responseSpeech=safeJS(response);const action=saved?`<button onclick="deleteCommunicationSentence('${key}')" class="w-8 h-8 rounded-full bg-stone-100 text-stone-400 hover:text-red-600 flex items-center justify-center active:scale-90 shrink-0" title="Xóa câu"><i class="fa-solid fa-trash-can text-xs"></i></button>`:`<button onclick="saveCommunicationSentence(${index})" class="px-2.5 py-1.5 rounded-lg bg-red-600 text-white text-[10px] font-bold active:scale-95"><i class="fa-solid fa-bookmark mr-1"></i>Lưu</button>`;return `<article class="bg-white rounded-2xl border border-stone-200 shadow-sm p-3.5 space-y-3"><div class="flex items-start justify-between gap-2"><span class="px-2.5 py-1 rounded-full bg-stone-100 text-stone-600 text-[9px] font-black uppercase tracking-wide">${escapeHTML(item.scenario||'Đời sống')}</span>${action}</div><div class="space-y-2"><div class="rounded-xl bg-red-50/70 border border-red-100 p-3"><div class="text-[9px] font-black text-red-500 uppercase mb-1">A · Nói</div><div class="flex items-start gap-2"><button onclick="speakHanzi('${speech}')" class="w-8 h-8 rounded-full bg-white text-red-600 flex items-center justify-center active:scale-90 shrink-0 border border-red-100" title="Nghe lượt A"><i class="fa-solid fa-volume-high text-xs"></i></button><div class="min-w-0 flex-1"><div class="font-hanzi font-bold text-stone-900 text-base leading-relaxed break-words">${escapeHTML(item.hanzi)}</div><div class="text-[11px] text-red-600 font-mono font-bold mt-1">${escapeHTML(item.pinyin)}</div><div class="mt-1.5 text-xs font-semibold text-stone-700">${escapeHTML(item.meaning_vi)}</div></div></div></div><div class="rounded-xl bg-stone-50 border border-stone-200 p-3"><div class="text-[9px] font-black text-stone-500 uppercase mb-1">B · Phản xạ</div><div class="flex items-start gap-2"><button onclick="speakHanzi('${responseSpeech}')" class="w-8 h-8 rounded-full bg-white text-stone-600 flex items-center justify-center active:scale-90 shrink-0 border border-stone-200" title="Nghe lượt B"><i class="fa-solid fa-volume-high text-xs"></i></button><div class="font-hanzi text-sm font-bold text-stone-900 leading-relaxed">${escapeHTML(response)}</div></div></div></div>${words?`<div><div class="text-[9px] font-bold text-stone-400 uppercase mb-1.5">Từ mục tiêu đã áp dụng</div><div class="flex flex-wrap gap-1.5">${words}</div></div>`:''}<div class="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 p-2.5 text-[10px] text-amber-900 leading-relaxed"><div class="font-bold mb-0.5"><i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> Khẩu ngữ & mẹo dùng</div><div>${escapeHTML(item.collocation_oral||'—')}</div>${item.practical_tip?`<div class="mt-1.5 pt-1.5 border-t border-dashed border-amber-200"><span class="font-bold">Mẹo:</span> ${escapeHTML(item.practical_tip)}</div>`:''}</div><div class="rounded-xl border border-stone-200 bg-white p-2.5"><div class="flex items-center justify-between gap-2 mb-2"><div class="text-[9px] font-black text-stone-500 uppercase">Luyện nghe & Shadowing</div><button onclick="speakCommunicationDialogue(${index},${saved?'true':'false'},1)" class="px-2 py-1 rounded-lg bg-red-50 text-red-600 text-[9px] font-bold">▶ 1.0x</button><button onclick="speakCommunicationDialogue(${index},${saved?'true':'false'},0.8)" class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 text-[9px] font-bold">▶ 0.8x</button></div><div class="flex items-center gap-2"><button onclick="startCommunicationShadowing(${index},${saved?'true':'false'})" class="px-2.5 py-2 rounded-lg bg-red-600 text-white text-[9px] font-black flex items-center gap-1"><i class="fa-solid fa-microphone"></i> ${saved?'Nhại câu này':'Luyện nói câu này'}</button><button onclick="stopCommunicationShadowing()" class="px-2.5 py-2 rounded-lg bg-stone-100 text-stone-600 text-[9px] font-bold">Dừng</button></div><div id="commShadowStatus_${prefix}_${index}" class="mt-1 text-[9px] text-stone-400">Bấm micro rồi đọc lại lượt A.</div><div id="commShadowScore_${prefix}_${index}" class="mt-1 text-[9px] leading-relaxed"></div><audio id="commShadowPlayback_${prefix}_${index}" class="hidden w-full mt-2" controls></audio></div></article>`;}
+    function getCommunicationItem(index,saved=false){return saved?communicationSaved[index]:communicationGenerated[index];}
+    async function speakCommunicationDialogue(index,saved=false,rate=1){const item=getCommunicationItem(index,saved);if(item)await speakCommunicationDialogueItem(item,rate);}
+    async function speakCommunicationDialogueItem(item,rate=1){stopCommunicationAudio();const lines=Array.isArray(item?.dialogue)&&item.dialogue.length?item.dialogue:[{speaker:'A',text:item?.hanzi||''},{speaker:'B',text:String(item?.response_preview||'').split('·')[0].trim()}];for(let i=0;i<lines.length;i++){if(!lines[i]?.text)continue;await speakHanzi(lines[i].text,{rate,listening:true,naturalProsody:true});if(i<lines.length-1)await sleep(700);}}
     function renderCommunicationGenerated(){const list=document.getElementById('commSentencesList');if(list)list.innerHTML=communicationGenerated.map((x,i)=>communicationCardHTML(x,{saved:false,index:i})).join('');}
     function openCommunicationModal(){renderCommunicationGenerated();document.getElementById('commSentencesModal')?.classList.remove('hidden');}
-    function closeCommunicationModal(){haptic();document.getElementById('commSentencesModal')?.classList.add('hidden');}
+    function closeCommunicationModal(){haptic();stopCommunicationAudio();document.getElementById('commSentencesModal')?.classList.add('hidden');}
     function saveCommunicationSentence(index){const item=communicationGenerated[index];if(!item)return;const key=`${item.hanzi}|${item.pinyin}`;if(communicationSaved.some(x=>`${x.hanzi}|${x.pinyin}`===key)){alert('Câu này đã được lưu rồi.');return;}communicationSaved.unshift({...item,id:Date.now()+Math.random().toString(36).slice(2,7),savedAt:new Date().toISOString()});localStorage.setItem('hn_communication_saved_v1',JSON.stringify(communicationSaved));renderCommunicationSentences();renderCommunicationGenerated();}
     function deleteCommunicationSentence(key){haptic();const next=communicationSaved.filter(x=>`${x.hanzi}|${x.pinyin}`!==key);if(next.length===communicationSaved.length)return;communicationSaved=next;localStorage.setItem('hn_communication_saved_v1',JSON.stringify(communicationSaved));renderCommunicationSentences();}
     function deleteAllCommunicationSentences(){haptic();if(!communicationSaved.length)return;if(confirm(`Xóa toàn bộ ${communicationSaved.length} câu giao tiếp đã lưu?`)){communicationSaved=[];localStorage.setItem('hn_communication_saved_v1','[]');renderCommunicationSentences();}}
-    function renderCommunicationSentences(){updateCommunicationScopeUI();const list=document.getElementById('savedCommunicationList'),empty=document.getElementById('emptyCommunication'),delAll=document.getElementById('deleteAllCommunicationBtn'),count=document.getElementById('communicationSavedCount');if(!list||!empty)return;if(count)count.innerText=`${communicationSaved.length} câu đã lưu`;if(delAll)delAll.classList.toggle('hidden',communicationSaved.length===0);if(!communicationSaved.length){list.innerHTML='';empty.classList.remove('hidden');return;}empty.classList.add('hidden');list.innerHTML=communicationSaved.map(x=>communicationCardHTML(x,{saved:true})).join('');}
+    function renderCommunicationSentences(){updateCommunicationScopeUI();const list=document.getElementById('savedCommunicationList'),empty=document.getElementById('emptyCommunication'),delAll=document.getElementById('deleteAllCommunicationBtn'),count=document.getElementById('communicationSavedCount');if(!list||!empty)return;if(count)count.innerText=`${communicationSaved.length} câu đã lưu`;if(delAll)delAll.classList.toggle('hidden',communicationSaved.length===0);if(!communicationSaved.length){list.innerHTML='';empty.classList.remove('hidden');return;}empty.classList.add('hidden');list.innerHTML=communicationSaved.map((x,i)=>communicationCardHTML(x,{saved:true,index:i})).join('');}
 
     // ================= AI PRACTICE STATE =================
     const ERROR_STORE_KEY = 'hn_learning_errors_v2';
