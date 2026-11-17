@@ -306,7 +306,7 @@
           </div>
           <div>
             <h2 class="font-extrabold text-sm text-stone-900">Kiểm Tra Từ Vựng Đã Lưu</h2>
-            <p class="text-[10px] text-stone-500">Tự đánh giá mức độ nhớ mặt chữ, nghĩa và phản xạ nghe</p>
+            <p class="text-[10px] text-stone-500">Tự đánh giá mức độ nhớ mặt chữ, nghĩa tiếng Việt và phản xạ nghe</p>
           </div>
         </div>
 
@@ -374,11 +374,9 @@
           </div>
 
           <div id="quizQuestionBox" class="py-4 px-3 bg-stone-50 rounded-2xl border border-stone-200/80 text-center space-y-1.5 min-h-[115px] flex flex-col items-center justify-center">
-            <!-- Nội dung câu hỏi render bằng JS -->
           </div>
 
           <div id="quizOptionsList" class="space-y-2">
-            <!-- 4 đáp án render bằng JS -->
           </div>
 
           <!-- Phản hồi & gợi nhớ sau khi chọn đáp án -->
@@ -586,8 +584,12 @@ Nếu người dùng nhập N từ thì kết quả phải là 1 JSON Array gồ
 
 QUY TRÌNH PHÂN TÍCH 5 LỚP BẮT BUỘC:
 1. Lớp 1 & 2 - TRA NGHĨA CHỮ ĐƠN (GROUNDING) & CHIẾT TỰ BỘ THỦ: Với MỖI chữ Hán cấu thành từ đầu vào, xác định rõ Pinyin, Hán Việt và nghĩa cốt lõi của chính chữ đơn đó. Tách các bộ thủ/thành phần biểu ý & biểu thanh có ích cho ghi nhớ (không bóc tách nét vụn vô nghĩa như 丨, 丶).
-2. Lớp 3 - ÂM HÁN VIỆT & MỎ NEO Ý NGHĨA (STORY): Đối chiếu âm Hán Việt. Nếu là "Hán Việt giả" (nghĩa tiếng Trung khác hẳn nghĩa tiếng Việt quen thuộc, ví dụ 小心 = cẩn thận chứ không phải nhỏ mọn, 方便 = tiện lợi/đi vệ sinh), BẮT BUỘC cảnh báo rõ trong \`hanviet_note\`. Viết \`story\` ngắn gọn, logic, nối trực tiếp hình ảnh chiết tự/chữ đơn đến NGHĨA CỐT LÕI (viết HOA ở cuối).
-3. Lớp 4 - TỪ LOẠI, CẤP ĐỘ HSK & CỤM TỪ CỐ ĐỊNH (COLLOCATION): Xác định cấp độ ước tính (\`hsk_level\`: ví dụ "HSK 1", "HSK 2", "HSK 3", "HSK 4", "HSK 5", "HSK 6"), từ loại (\`pos\`, ví dụ: Động từ, Danh từ, Tính từ, Phó từ) và cung cấp 2-3 cụm từ cố định (\`collocations\`) thực tế hay đi kèm nhất (kèm pinyin & nghĩa Việt).
+2. Lớp 3 - ÂM HÁN VIỆT & NGHĨA TIẾNG VIỆT & MỎ NEO Ý NGHĨA (STORY):
+   - \`hanviet\`: Âm Hán Việt (viết hoa chữ cái đầu, ví dụ: "Hồi Khứ", "Ni").
+   - \`hanviet_meaning\`: BẮT BUỘC phải là nghĩa tiếng Việt ngắn gọn, tự nhiên (tuyệt đối KHÔNG được để trống, kể cả với trợ từ như 呢 -> "Còn... thì sao; nhỉ, nhé").
+   - Nếu là "Hán Việt giả" (nghĩa tiếng Trung khác hẳn nghĩa tiếng Việt quen thuộc, ví dụ 小心 = cẩn thận chứ không phải nhỏ mọn, 方便 = tiện lợi/đi vệ sinh), cảnh báo rõ trong \`hanviet_note\`.
+   - Viết \`story\` ngắn gọn, logic, nối trực tiếp hình ảnh chiết tự/chữ đơn đến NGHĨA CỐT LÕI (viết HOA ở cuối).
+3. Lớp 4 - TỪ LOẠI, CẤP ĐỘ HSK & CỤM TỪ CỐ ĐỊNH (COLLOCATION): Xác định cấp độ ước tính (\`hsk_level\`: ví dụ "HSK 1", "HSK 2", "HSK 3", "HSK 4", "HSK 5", "HSK 6"), từ loại (\`pos\`, ví dụ: Động từ, Danh từ, Tính từ, Trợ từ) và cung cấp 2-3 cụm từ cố định (\`collocations\`) thực tế hay đi kèm nhất (kèm pinyin & nghĩa Việt).
 4. Lớp 5 - MẠNG LƯỚI TỪ VỰNG & CÂU VÍ DỤ: Đưa ra 2-3 từ liên quan trong mạng lưới (\`related_words\`: từ trái nghĩa, đồng nghĩa hoặc từ ghép cùng gốc chữ) và 1 câu ví dụ thực tế ngắn gọn.
 
 QUY TẮC JSON BẮT BUỘC:
@@ -735,6 +737,67 @@ SCHEMA:
         .toLowerCase();
     }
 
+    /* ================= CHUẨN HÓA NGHĨA TIẾNG VIỆT (KHÔNG LẤY HÁN VIỆT) ================= */
+    function resolveVietnameseMeaning(w) {
+      if (!w || typeof w !== 'object') return 'Chưa có nghĩa tiếng Việt';
+
+      const hanvietClean = String(w.hanviet || '').trim().toLowerCase();
+      const candidates = [
+        w.hanviet_meaning,
+        w.meaning,
+        w.meaning_vi,
+        w.vietnamese_meaning
+      ];
+
+      for (const cand of candidates) {
+        const raw = String(cand || '').trim();
+        if (!raw) continue;
+        // Tránh trường hợp lưu nhầm âm Hán Việt vào ô nghĩa
+        if (raw.toLowerCase() === hanvietClean) continue;
+        if (!/[.!?。！？]$/.test(raw) && raw.length <= 60) {
+          return raw;
+        }
+        const firstClause = raw.split(/[.!?。！？\n]/)[0].trim();
+        if (firstClause && firstClause.toLowerCase() !== hanvietClean && firstClause.length <= 60) {
+          return firstClause;
+        }
+      }
+
+      // Nếu ô nghĩa bị rỗng (ví dụ từ 呢 ở ảnh 1), trích phần nghĩa IN HOA sau dấu mũi tên trong story
+      const story = String(w.story || '').trim();
+      if (story) {
+        const arrowMatch = story.match(/(?:→|->|=>)\s*([^.!?\n]+)[.!?]?$/);
+        if (arrowMatch && arrowMatch[1]) {
+          const extracted = arrowMatch[1].trim();
+          const formatted = extracted.charAt(0).toUpperCase() + extracted.slice(1).toLowerCase();
+          if (formatted && formatted.toLowerCase() !== hanvietClean) {
+            return formatted;
+          }
+        }
+      }
+
+      // Thử lấy từ ghi chú hoặc nghĩa chữ đơn nếu là từ 1 âm tiết
+      const breakdown = Array.isArray(w.char_breakdown) ? w.char_breakdown : [];
+      if (breakdown.length === 1 && breakdown[0]?.meaning) {
+        const m = String(breakdown[0].meaning).trim();
+        if (m && m.toLowerCase() !== hanvietClean) return m;
+      }
+
+      const note = String(w.hanviet_note || '').trim();
+      if (note) {
+        const firstNote = note.split(/[.!?。！？\n]/)[0].trim();
+        if (firstNote && firstNote.length <= 60) return firstNote;
+      }
+
+      const exVi = String(w.example_vi || '').trim();
+      if (exVi) {
+        const shortEx = exVi.split(/[.!?。！？\n]/)[0].trim();
+        return shortEx.length <= 50 ? shortEx : shortEx.slice(0, 47) + '...';
+      }
+
+      return 'Trợ từ / Từ vựng tiếng Trung';
+    }
+
     /* ================= TỐC ĐỘ PHÁT ÂM ================= */
     function setSpeechSpeed(val) {
       haptic();
@@ -840,14 +903,32 @@ SCHEMA:
           qType = types[Math.floor(Math.random() * types.length)];
         }
 
-        const others = shuffleList(distractorPool.filter(w => w.hanzi !== word.hanzi));
-        const distractors = others.slice(0, 3);
-        while (distractors.length < 3) {
-          distractors.push({
-            hanzi: '学习',
-            pinyin: 'xuéxí',
-            hanviet_meaning: 'Học tập (mẫu)'
-          });
+        const correctMeaning = resolveVietnameseMeaning(word).toLowerCase();
+        const others = shuffleList(distractorPool.filter(w => {
+          if (w.hanzi === word.hanzi) return false;
+          const m = resolveVietnameseMeaning(w).toLowerCase();
+          return m && m !== correctMeaning;
+        }));
+
+        const distractors = [];
+        const usedMeanings = new Set([correctMeaning]);
+        for (const cand of others) {
+          const m = resolveVietnameseMeaning(cand).toLowerCase();
+          if (!usedMeanings.has(m)) {
+            usedMeanings.add(m);
+            distractors.push(cand);
+          }
+          if (distractors.length >= 3) break;
+        }
+
+        const fallbackSamples = [
+          { hanzi: '学习', pinyin: 'xuéxí', hanviet_meaning: 'Học tập' },
+          { hanzi: '工作', pinyin: 'gōngzuò', hanviet_meaning: 'Công việc, làm việc' },
+          { hanzi: '朋友', pinyin: 'péngyou', hanviet_meaning: 'Bạn bè' }
+        ];
+        let fbIdx = 0;
+        while (distractors.length < 3 && fbIdx < fallbackSamples.length) {
+          distractors.push(fallbackSamples[fbIdx++]);
         }
 
         const rawChoices = shuffleList([
@@ -937,19 +1018,19 @@ SCHEMA:
       nextBtn.classList.add('hidden');
 
       if (q.type === 'hanzi_to_vi') {
-        typeBadge.innerText = 'Nhìn Chữ Hán → Chọn Nghĩa';
+        typeBadge.innerText = 'Nhìn Chữ Hán → Chọn Nghĩa Việt';
         qBox.innerHTML = `
           <div class="text-4xl font-calligraphy text-stone-900">${escapeHTML(q.word.hanzi)}</div>
-          <div class="text-xs font-mono font-bold text-red-600">${escapeHTML(q.word.pinyin || '')}</div>
+          <div id="quizHiddenPinyin" class="text-[11px] font-mono font-bold text-stone-400">Chạm loa góc phải để nghe gợi ý</div>
         `;
       } else if (q.type === 'vi_to_hanzi') {
-        typeBadge.innerText = 'Nhìn Nghĩa → Chọn Chữ Hán';
+        typeBadge.innerText = 'Nhìn Nghĩa Việt → Chọn Chữ Hán';
         qBox.innerHTML = `
-          <div class="text-base font-extrabold text-stone-900 leading-snug">${escapeHTML(q.word.hanviet_meaning || '')}</div>
-          ${q.word.hanviet ? `<div class="text-[11px] font-semibold text-stone-400">Hán Việt: ${escapeHTML(q.word.hanviet)}</div>` : ''}
+          <div class="text-base font-extrabold text-stone-900 leading-snug">${escapeHTML(resolveVietnameseMeaning(q.word))}</div>
+          <div class="text-[11px] font-semibold text-stone-400">Chọn chữ Hán tương ứng với nghĩa tiếng Việt trên</div>
         `;
       } else {
-        typeBadge.innerText = 'Nghe Phát Âm → Chọn Đáp Án';
+        typeBadge.innerText = 'Nghe Phát Âm → Chọn Nghĩa Việt';
         qBox.innerHTML = `
           <button onclick="playCurrentQuizAudio()" class="w-14 h-14 rounded-full bg-red-600 text-white shadow-md shadow-red-200 flex items-center justify-center active:scale-90 transition">
             <i class="fa-solid fa-volume-high text-xl"></i>
@@ -962,8 +1043,8 @@ SCHEMA:
       const letters = ['A', 'B', 'C', 'D'];
       optionsBox.innerHTML = q.choices.map((ch, i) => {
         const labelText = q.type === 'vi_to_hanzi'
-          ? `<span class="font-hanzi font-black text-lg text-stone-900">${escapeHTML(ch.word.hanzi)}</span> <span class="text-[11px] font-mono text-stone-400 ml-1">(${escapeHTML(ch.word.pinyin || '')})</span>`
-          : `<span class="font-bold text-xs text-stone-800">${escapeHTML(ch.word.hanviet_meaning || ch.word.example_vi || '')}</span>`;
+          ? `<span class="font-hanzi font-black text-xl text-stone-900">${escapeHTML(ch.word.hanzi)}</span>`
+          : `<span class="font-bold text-xs text-stone-800 leading-snug block">${escapeHTML(resolveVietnameseMeaning(ch.word))}</span>`;
 
         return `
           <button onclick="selectQuizOption(${i})" id="quizOptBtn_${i}" class="w-full p-3 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-left flex items-center gap-3 active:scale-[0.99] transition">
@@ -983,6 +1064,12 @@ SCHEMA:
       const chosen = q.choices[choiceIdx];
       const isCorrect = Boolean(chosen?.isCorrect);
 
+      const hiddenPin = document.getElementById('quizHiddenPinyin');
+      if (hiddenPin) {
+        hiddenPin.className = 'text-xs font-mono font-bold text-red-600';
+        hiddenPin.innerText = q.word.pinyin || '';
+      }
+
       if (isCorrect) {
         quizState.correctCount++;
       } else {
@@ -997,6 +1084,12 @@ SCHEMA:
         const btn = document.getElementById(`quizOptBtn_${i}`);
         if (!btn) return;
         btn.disabled = true;
+        if (q.type === 'vi_to_hanzi') {
+          const textDiv = btn.querySelector('div');
+          if (textDiv) {
+            textDiv.innerHTML = `<span class="font-hanzi font-black text-xl text-stone-900">${escapeHTML(ch.word.hanzi)}</span> <span class="text-[11px] font-mono text-stone-500 ml-1">(${escapeHTML(ch.word.pinyin || '')})</span>`;
+          }
+        }
         if (ch.isCorrect) {
           btn.className = 'w-full p-3 rounded-xl border-2 border-emerald-500 bg-emerald-50 text-left flex items-center gap-3 transition';
         } else if (i === choiceIdx && !isCorrect) {
@@ -1019,7 +1112,7 @@ SCHEMA:
             <i class="fa-solid fa-volume-high text-red-600 mr-0.5"></i> Nghe
           </button>
         </div>
-        <div class="text-[11px] font-semibold">Nghĩa: ${escapeHTML(q.word.hanviet_meaning || '')} (${escapeHTML(q.word.hanviet || '')})</div>
+        <div class="text-[11px] font-semibold">Nghĩa tiếng Việt: ${escapeHTML(resolveVietnameseMeaning(q.word))} ${q.word.hanviet ? `(Hán Việt: ${escapeHTML(q.word.hanviet)})` : ''}</div>
         ${q.word.story ? `<div class="text-[10px] opacity-85 leading-relaxed pt-0.5"><i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i>${escapeHTML(q.word.story)}</div>` : ''}
       `;
 
@@ -1082,7 +1175,7 @@ SCHEMA:
                 <span class="font-hanzi font-black text-base text-stone-900">${escapeHTML(w.hanzi)}</span>
                 <span class="text-[11px] font-mono text-red-600 font-bold">${escapeHTML(w.pinyin || '')}</span>
               </div>
-              <div class="text-[11px] text-stone-600 truncate">${escapeHTML(w.hanviet_meaning || '')}</div>
+              <div class="text-[11px] text-stone-600 truncate">${escapeHTML(resolveVietnameseMeaning(w))}</div>
             </div>
             <button onclick="speakHanzi('${safeJS(w.hanzi)}')" class="w-8 h-8 rounded-full bg-white text-red-600 border border-rose-200 flex items-center justify-center shrink-0 active:scale-90">
               <i class="fa-solid fa-volume-high text-[10px]"></i>
@@ -1330,7 +1423,7 @@ SCHEMA:
                 {
                   parts: [
                     { text: SYSTEM_PROMPT },
-                    { text: `DANH SÁCH TỪ VỰNG NGƯỜI DÙNG:\n${input}\n\nHãy phân tích toàn bộ danh sách trên và trả về đúng 1 JSON Array duy nhất.` }
+                    { text: `DANH SÁCH TỪ VỰNG NGƯỜI DÙNG:\n${input}\n\nHãy phân tích toàn bộ danh sách trên và trả về đúng 1 JSON Array duy nhất. Nhớ điền đầy đủ hanviet_meaning bằng tiếng Việt cho mọi từ.` }
                   ]
                 }
               ],
@@ -1348,7 +1441,13 @@ SCHEMA:
         if (!raw) throw new Error('Gemini không trả về dữ liệu.');
 
         const parsed = safeParseGeminiJSON(raw);
-        stagingData = parsed.filter(item => item && typeof item === 'object' && !Array.isArray(item));
+        stagingData = parsed
+          .filter(item => item && typeof item === 'object' && !Array.isArray(item))
+          .map(item => ({
+            ...item,
+            hanviet_meaning: resolveVietnameseMeaning(item)
+          }));
+
         if (!stagingData.length) throw new Error('Không đọc được kết quả phân tích từ AI.');
 
         if (targetCategory) {
@@ -1384,6 +1483,7 @@ SCHEMA:
       const cat = document.getElementById('categorySelect').value || 'Sổ tay cơ bản';
       const readyData = stagingData.map(item => ({
         ...item,
+        hanviet_meaning: resolveVietnameseMeaning(item),
         id: Date.now() + Math.random().toString(36).substring(2, 7),
         category: cat,
         starred: false,
@@ -1704,6 +1804,7 @@ SCHEMA:
       const relatedWords = Array.isArray(item.related_words) ? item.related_words : [];
       const blurHanzi = !isStaging && recallMode === 'hanzi' ? 'recall-blur' : '';
       const blurMeaning = !isStaging && recallMode === 'meaning' ? 'recall-blur' : '';
+      const vietMeaning = resolveVietnameseMeaning(item);
 
       return `
         <div class="bg-white rounded-2xl p-4 border ${item.starred && !isStaging ? 'border-amber-300' : 'border-stone-200'} shadow-sm space-y-3">
@@ -1736,9 +1837,9 @@ SCHEMA:
           </div>
 
           <div onclick="this.classList.toggle('revealed')" class="space-y-1.5 ${blurMeaning}">
-            <div class="flex items-center justify-between text-xs gap-2">
-              <span class="font-bold text-stone-800">Hán Việt: ${escapeHTML(item.hanviet)}</span>
-              <span class="text-red-700 font-extrabold text-right">${escapeHTML(item.hanviet_meaning)}</span>
+            <div class="flex items-baseline justify-between text-xs gap-3">
+              <span class="font-bold text-stone-800 shrink-0">Hán Việt: ${escapeHTML(item.hanviet || '—')}</span>
+              <span class="text-red-700 font-extrabold text-right leading-snug">${escapeHTML(vietMeaning)}</span>
             </div>
             ${item.hanviet_note ? `<div class="text-[10px] text-amber-900 bg-amber-50/80 border border-amber-200/70 rounded-lg px-2.5 py-1.5 leading-relaxed"><i class="fa-solid fa-circle-info text-amber-600 mr-1"></i>${escapeHTML(item.hanviet_note)}</div>` : ''}
           </div>
@@ -1843,7 +1944,7 @@ SCHEMA:
           const pinyinPlain = stripToneMarks(item.pinyin || '');
           const pinyinCompact = pinyinPlain.replace(/\s+/g, '');
           const hanvietPlain = stripToneMarks(item.hanviet || '');
-          const meaningPlain = stripToneMarks(item.hanviet_meaning || '');
+          const meaningPlain = stripToneMarks(resolveVietnameseMeaning(item));
           const examplePlain = stripToneMarks(`${item.example_cn || ''} ${item.example_vi || ''}`);
           const catPlain = stripToneMarks(item.category || '');
           const collocationPlain = Array.isArray(item.collocations)
@@ -1920,437 +2021,4 @@ SCHEMA:
         updateAzureSpeechHint();
         alert('Đã xóa cấu hình Azure TTS.');
         return;
-      }
-      localStorage.setItem(AZURE_TTS_KEY_STORAGE, key);
-      localStorage.setItem(AZURE_TTS_REGION_STORAGE, region);
-      updateAzureSpeechHint();
-      alert('Đã lưu cấu hình Microsoft Azure TTS.');
-    }
-
-    function updateAzureSpeechHint() {
-      const hint = document.getElementById('azureSpeechHint');
-      if (!hint) return;
-      const { key, region } = getAzureSpeechConfig();
-      hint.textContent = (key && region)
-        ? `Đang bật Azure (${AZURE_TTS_VOICE} · ${region}).`
-        : 'Nếu để trống, app sẽ dùng giọng thiết bị hoặc tự động phát MP3 trực tuyến.';
-    }
-
-    function escapeXmlForSsml(value) {
-      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-    }
-
-    async function speakWithAzureXiaoyi(text) {
-      const { key, region } = getAzureSpeechConfig();
-      if (!text || !key || !region) return false;
-      const endpoint = `https://${encodeURIComponent(region)}.tts.speech.microsoft.com/cognitiveservices/v1`;
-      const ratePct = Math.round((speechSpeed - 1) * 100);
-      const ssml = `<speak version="1.0" xml:lang="zh-CN"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${ratePct >= 0 ? '+' : ''}${ratePct}%">${escapeXmlForSsml(text)}</prosody></voice></speak>`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': key,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': AZURE_TTS_OUTPUT_FORMAT
-        },
-        body: ssml
-      });
-      if (!response.ok) throw new Error(`Azure TTS HTTP ${response.status}`);
-      const blob = await response.blob();
-      if (!blob.size) throw new Error('Azure audio empty');
-      const audioUrl = URL.createObjectURL(blob);
-      try {
-        await new Promise((resolve, reject) => {
-          const audio = new Audio(audioUrl);
-          activeTtsAudio = audio;
-          audio.playsInline = true;
-          audio.onended = () => { if (activeTtsAudio === audio) activeTtsAudio = null; resolve(true); };
-          audio.onerror = () => { if (activeTtsAudio === audio) activeTtsAudio = null; reject(new Error('Audio playback failed')); };
-          audio.play().catch(reject);
-        });
-      } finally {
-        URL.revokeObjectURL(audioUrl);
-      }
-      return true;
-    }
-
-    async function testAzureSpeech() {
-      haptic();
-      const { key, region } = getAzureSpeechConfig();
-      if (!key || !region) {
-        alert('Hãy nhập Azure Key và Region rồi bấm Lưu trước.');
-        return;
-      }
-      try {
-        stopActiveChineseTTS();
-        await speakWithAzureXiaoyi('你好呀，今天一起学中文吧。');
-      } catch (e) {
-        alert('Lỗi Azure TTS: ' + (e?.message || e));
-      }
-    }
-
-    function stopActiveChineseTTS() {
-      if (activeTtsAudio) {
-        try { activeTtsAudio.pause(); activeTtsAudio.removeAttribute('src'); activeTtsAudio.load(); } catch (_) {}
-        activeTtsAudio = null;
-      }
-      if ('speechSynthesis' in window) {
-        try { window.speechSynthesis.cancel(); } catch (_) {}
-      }
-    }
-
-    function scoreChineseVoice(v) {
-      const name = String(v?.name || '').toLowerCase();
-      const lang = String(v?.lang || '').toLowerCase();
-      let score = 0;
-      if (lang === 'zh-cn' || lang === 'zh_hans' || lang === 'cmn-hans-cn') score += 35;
-      else if (lang.includes('zh')) score += 20;
-      if (DEFAULT_TTS_VOICE_PATTERN.test(name)) score += 1000;
-      for (const k of ['xiaoxiao', 'tingting', 'female', '女', 'natural', 'neural', 'google 普通话', 'microsoft']) {
-        if (name.includes(k)) score += 12;
-      }
-      return score;
-    }
-
-    function loadSpeechVoices() {
-      if (!('speechSynthesis' in window)) return;
-      const refresh = () => {
-        try { availableVoices = window.speechSynthesis.getVoices() || []; } catch (e) { availableVoices = []; }
-        renderTTSVoiceOptions();
-      };
-      refresh();
-      window.speechSynthesis.onvoiceschanged = refresh;
-    }
-
-    function getStandardNativeVoice() {
-      if (!('speechSynthesis' in window)) return null;
-      try { if (!availableVoices.length) availableVoices = window.speechSynthesis.getVoices() || []; } catch (_) {}
-      const zh = availableVoices.filter(v => {
-        const l = String(v?.lang || '').toLowerCase();
-        return l.includes('zh') || l.includes('cmn');
-      });
-      const selected = localStorage.getItem(TTS_VOICE_KEY) || '';
-      if (selected) {
-        const pick = zh.find(v => v.name === selected);
-        if (pick) return pick;
-      }
-      return zh.slice().sort((a, b) => scoreChineseVoice(b) - scoreChineseVoice(a))[0] || null;
-    }
-
-    function renderTTSVoiceOptions() {
-      const select = document.getElementById('ttsVoiceSelect');
-      if (!select) return;
-      const zh = (availableVoices || []).filter(v => {
-        const l = String(v?.lang || '').toLowerCase();
-        return l.includes('zh') || l.includes('cmn');
-      }).slice().sort((a, b) => scoreChineseVoice(b) - scoreChineseVoice(a));
-      const selected = localStorage.getItem(TTS_VOICE_KEY) || '';
-      select.innerHTML = '<option value="">Tự động — Ưu tiên Xiaoyi + Dự phòng Online</option>' + zh.map(v => `<option value="${escapeHTML(v.name || '')}" ${selected === v.name ? 'selected' : ''}>${escapeHTML(v.name || '')} (${escapeHTML(v.lang || '')})</option>`).join('');
-    }
-
-    function saveSelectedChineseVoice(name) {
-      if (name) localStorage.setItem(TTS_VOICE_KEY, name);
-      else localStorage.removeItem(TTS_VOICE_KEY);
-    }
-
-    function speakWithSystemTTS(text) {
-      if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return Promise.resolve(false);
-      return new Promise(resolve => {
-        try {
-          if (!availableVoices.length) availableVoices = window.speechSynthesis.getVoices() || [];
-        } catch (_) {}
-        const voice = getStandardNativeVoice();
-        if (!voice && availableVoices.length > 0) {
-          resolve(false);
-          return;
-        }
-
-        let started = false;
-        let settled = false;
-        const finish = (ok) => {
-          if (settled) return;
-          settled = true;
-          resolve(ok);
-        };
-
-        const u = new SpeechSynthesisUtterance(text);
-        if (voice) u.voice = voice;
-        u.lang = voice?.lang || 'zh-CN';
-        u.rate = speechSpeed;
-        u.volume = 1.0;
-
-        const watchdog = setTimeout(() => {
-          if (!started) {
-            try { window.speechSynthesis.cancel(); } catch (_) {}
-            finish(false);
-          }
-        }, 1200);
-
-        u.onstart = () => { started = true; clearTimeout(watchdog); };
-        u.onend = () => { clearTimeout(watchdog); finish(started); };
-        u.onerror = () => { clearTimeout(watchdog); finish(false); };
-
-        try {
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.resume();
-          window.speechSynthesis.speak(u);
-        } catch (_) {
-          clearTimeout(watchdog);
-          finish(false);
-        }
-      });
-    }
-
-    function playRemoteChineseTTS(text, requestId) {
-      return new Promise((resolve, reject) => {
-        const q = encodeURIComponent(text);
-        const urls = [
-          `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-CN&ttsspeed=0.7&q=${q}`,
-          `https://translate.google.com/translate_tts?ie=UTF-8&client=gtx&tl=zh-CN&ttsspeed=0.7&q=${q}`,
-          `https://translate.google.com.vn/translate_tts?ie=UTF-8&client=gtx&tl=zh-CN&ttsspeed=0.7&q=${q}`
-        ];
-        let idx = 0;
-
-        const tryNext = () => {
-          if (idx >= urls.length) {
-            reject(new Error('REMOTE_TTS_FAILED'));
-            return;
-          }
-          const url = urls[idx++];
-          let settled = false;
-          const audio = new Audio();
-          activeTtsAudio = audio;
-          audio.preload = 'auto';
-          audio.playsInline = true;
-          audio.setAttribute('playsinline', '');
-          audio.playbackRate = speechSpeed;
-          audio.defaultPlaybackRate = speechSpeed;
-
-          audio.onended = () => {
-            if (settled) return;
-            settled = true;
-            if (requestId === ttsRequestId) activeTtsAudio = null;
-            resolve(true);
-          };
-          audio.onerror = () => {
-            if (settled) return;
-            settled = true;
-            if (activeTtsAudio === audio) activeTtsAudio = null;
-            tryNext();
-          };
-
-          audio.src = url;
-          audio.onloadedmetadata = () => {
-            audio.playbackRate = speechSpeed;
-          };
-          Promise.resolve(audio.play()).then(() => {
-            audio.playbackRate = speechSpeed;
-          }).catch(() => {
-            if (settled) return;
-            settled = true;
-            if (activeTtsAudio === audio) activeTtsAudio = null;
-            tryNext();
-          });
-        };
-
-        tryNext();
-      });
-    }
-
-    async function speakHanzi(text) {
-      haptic();
-      const cleanText = String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (!cleanText) return;
-
-      const requestId = ++ttsRequestId;
-      stopActiveChineseTTS();
-
-      // Tầng 1: Azure Neural TTS (nếu có)
-      try {
-        if (await speakWithAzureXiaoyi(cleanText)) return;
-      } catch (e) {
-        console.warn('Azure TTS fallback:', e);
-      }
-
-      // Tầng 2: Giọng đọc thiết bị
-      try {
-        if (await speakWithSystemTTS(cleanText)) return;
-      } catch (e) {
-        console.warn('System TTS fallback:', e);
-      }
-
-      // Tầng 3: MP3 trực tuyến với tốc độ chậm rõ
-      try {
-        await playRemoteChineseTTS(cleanText, requestId);
-      } catch (err) {
-        console.warn('Tất cả nguồn âm thanh không khả dụng:', err);
-        const badge = document.getElementById('headerModelBadge');
-        if (badge) {
-          const old = badge.innerText;
-          badge.innerText = 'Kiểm tra âm lượng / mạng';
-          setTimeout(() => { badge.innerText = old; }, 2200);
-        }
-      }
-    }
-
-    function speakModalWord() {
-      if (currentWordObj?.hanzi) speakHanzi(currentWordObj.hanzi);
-    }
-
-    /* ================= CANVAS THƯ PHÁP CẢM ỨNG ================= */
-    function initNativeTouchCalligraphy() {
-      canvas = document.getElementById('paintCanvas');
-      ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
-        return { x: touch.clientX - rect.left, y: touch.clientY - rect.top, time: Date.now() };
-      }
-
-      function startStroke(e) {
-        e.preventDefault(); e.stopPropagation();
-        isDrawing = true;
-        const pt = getPos(e);
-        pt.width = 7;
-        strokePoints = [pt];
-        ctx.fillStyle = BRUSH_COLOR;
-        ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2); ctx.fill();
-      }
-
-      function moveStroke(e) {
-        if (!isDrawing) return;
-        e.preventDefault(); e.stopPropagation();
-        const currentPt = getPos(e);
-        const prevPt = strokePoints[strokePoints.length - 1];
-        if (!prevPt) return;
-        const dist = Math.hypot(currentPt.x - prevPt.x, currentPt.y - prevPt.y);
-        if (dist < 1) return;
-        const dt = Math.max(8, currentPt.time - prevPt.time);
-        const targetWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, 11 - (dist / dt) * 4));
-        currentPt.width = prevPt.width * 0.7 + targetWidth * 0.3;
-        strokePoints.push(currentPt);
-        ctx.strokeStyle = BRUSH_COLOR;
-        ctx.lineWidth = currentPt.width;
-        ctx.beginPath(); ctx.moveTo(prevPt.x, prevPt.y); ctx.lineTo(currentPt.x, currentPt.y); ctx.stroke();
-      }
-
-      function endStroke() { if (isDrawing) { isDrawing = false; strokePoints = []; } }
-
-      canvas.addEventListener('touchstart', startStroke, { passive: false });
-      canvas.addEventListener('touchmove', moveStroke, { passive: false });
-      canvas.addEventListener('touchend', endStroke, { passive: false });
-      canvas.addEventListener('mousedown', startStroke);
-      canvas.addEventListener('mousemove', moveStroke);
-      window.addEventListener('mouseup', endStroke);
-    }
-
-    function resizeAndResetCanvas() {
-      const box = document.getElementById('canvasBox');
-      const rect = box.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-    }
-
-    function clearCanvas() {
-      haptic();
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      strokePoints = [];
-    }
-
-    function toggleWatermark() {
-      haptic();
-      showWatermark = !showWatermark;
-      document.getElementById('watermarkChar').style.opacity = showWatermark ? '1' : '0';
-      document.getElementById('btnWatermark').innerHTML = `<i class="fa-solid fa-${showWatermark ? 'eye' : 'eye-slash'} text-red-600"></i> <span>Chữ mẫu: ${showWatermark ? 'Bật' : 'Tắt'}</span>`;
-    }
-
-    function lockGlobalScroll(e) { e.preventDefault(); }
-
-    function openWritingPad(wordObj) {
-      haptic();
-      currentWordObj = wordObj;
-      currentCharIndex = 0;
-      document.getElementById('writePinyin').innerText = wordObj.pinyin;
-      document.getElementById('writeHanviet').innerText = `${wordObj.hanviet} (${wordObj.hanviet_meaning})`;
-      const chars = Array.from(wordObj.hanzi);
-      document.getElementById('charSelector').innerHTML = chars.map((char, idx) => `
-        <button onclick="selectCharToPractice(${idx})" class="char-btn w-10 h-10 rounded-xl font-calligraphy font-bold text-xl transition active:scale-95 ${idx === 0 ? 'bg-red-600 text-white shadow-sm' : 'bg-stone-100 text-stone-700'}">
-          ${char}
-        </button>
-      `).join('');
-      document.getElementById('watermarkChar').innerText = chars[0];
-      document.getElementById('writingModal').classList.remove('hidden');
-      document.addEventListener('touchmove', lockGlobalScroll, { passive: false });
-      requestAnimationFrame(() => { resizeAndResetCanvas(); clearCanvas(); });
-    }
-
-    function selectCharToPractice(idx) {
-      haptic();
-      currentCharIndex = idx;
-      const chars = Array.from(currentWordObj.hanzi);
-      document.querySelectorAll('.char-btn').forEach((btn, i) => {
-        btn.className = `char-btn w-10 h-10 rounded-xl font-calligraphy font-bold text-xl transition active:scale-95 ${i === idx ? 'bg-red-600 text-white shadow-sm' : 'bg-stone-100 text-stone-700'}`;
-      });
-      document.getElementById('watermarkChar').innerText = chars[idx];
-      clearCanvas();
-    }
-
-    function closeWritingPad() {
-      haptic();
-      document.getElementById('writingModal').classList.add('hidden');
-      document.removeEventListener('touchmove', lockGlobalScroll);
-    }
-
-    /* ================= SAO LƯU & XÓA DỮ LIỆU ================= */
-    function exportJSON() {
-      haptic();
-      const backup = { version: 4, exportedAt: new Date().toISOString(), vocabStore, categories };
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `HackNao_Vocab_${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }
-
-    async function importJSONBackup(file) {
-      if (!file) return;
-      try {
-        const backup = JSON.parse(await file.text());
-        if (Array.isArray(backup.vocabStore)) vocabStore = backup.vocabStore;
-        if (Array.isArray(backup.categories)) categories = backup.categories.length ? backup.categories : ['Sổ tay cơ bản'];
-        localStorage.setItem('hn_vocab_store', JSON.stringify(vocabStore));
-        localStorage.setItem('hn_categories', JSON.stringify(categories));
-        updateVocabCounters();
-        renderCategoryOptions();
-        renderSavedCards();
-        renderQuizScopeOptions();
-        alert(`Đã khôi phục ${vocabStore.length} từ vựng thành công!`);
-      } catch (err) {
-        alert('File JSON không hợp lệ.');
-      }
-    }
-
-    function clearAllData() {
-      haptic();
-      if (confirm('Bạn chắc chắn muốn xóa toàn bộ kho từ vựng đã lưu?')) {
-        vocabStore = [];
-        categories = ['Sổ tay cơ bản'];
-        currentFilter = 'ALL';
-        localStorage.setItem('hn_vocab_store', '[]');
-        localStorage.setItem('hn_categories', JSON.stringify(categories));
-        updateVocabCounters();
-        renderCategoryOptions();
-        renderSavedCards();
-        renderQuizScopeOptions();
-      }
-    }
-  </script>
-</body>
-</html>
+  
