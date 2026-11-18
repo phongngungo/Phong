@@ -467,7 +467,7 @@
         </div>
 
         <select id="ttsVoiceSelect" onchange="saveSelectedChineseVoice(this.value)" class="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-red-500">
-          <option value="">Tự động — Ưu tiên Xiaoyi + Dự phòng Online</option>
+          <option value="">Tự động — Hệ thống + Dự phòng Online</option>
         </select>
 
         <div class="pt-2 border-t border-stone-100 space-y-2">
@@ -677,6 +677,7 @@ SCHEMA:
     let availableVoices = [];
     let activeTtsAudio = null;
     let ttsRequestId = 0;
+    let audioUnlocked = false;
     const TTS_VOICE_KEY = "hn_tts_voice_name_v2";
     const TTS_SPEED_KEY = "hn_tts_speed_v1";
     let speechSpeed = parseFloat(localStorage.getItem(TTS_SPEED_KEY) || '0.75') || 0.75;
@@ -703,6 +704,32 @@ SCHEMA:
       loadSpeechVoices();
       setTimeout(renderTTSVoiceOptions, 500);
     };
+
+    function unlockMobileAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.resume();
+          const u = new SpeechSynthesisUtterance('');
+          u.lang = 'zh-CN';
+          u.volume = 0;
+          window.speechSynthesis.speak(u);
+          window.speechSynthesis.cancel();
+        }
+      } catch (_) {}
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const actx = new AudioCtx();
+          if (actx.state === 'suspended') actx.resume();
+        }
+      } catch (_) {}
+    }
+
+    ['pointerdown', 'touchstart', 'click'].forEach(evt => {
+      document.addEventListener(evt, unlockMobileAudio, { capture: true, passive: true, once: true });
+    });
 
     function haptic() {
       if (navigator.vibrate) navigator.vibrate(12);
@@ -2125,7 +2152,7 @@ SCHEMA:
         return l.includes('zh') || l.includes('cmn');
       }).slice().sort((a, b) => scoreChineseVoice(b) - scoreChineseVoice(a));
       const selected = localStorage.getItem(TTS_VOICE_KEY) || '';
-      select.innerHTML = '<option value="">Tự động — Ưu tiên Xiaoyi + Dự phòng Online</option>' + zh.map(v => `<option value="${escapeHTML(v.name || '')}" ${selected === v.name ? 'selected' : ''}>${escapeHTML(v.name || '')} (${escapeHTML(v.lang || '')})</option>`).join('');
+      select.innerHTML = '<option value="">Tự động — Hệ thống + Dự phòng Online</option>' + zh.map(v => `<option value="${escapeHTML(v.name || '')}" ${selected === v.name ? 'selected' : ''}>${escapeHTML(v.name || '')} (${escapeHTML(v.lang || '')})</option>`).join('');
     }
 
     function saveSelectedChineseVoice(name) {
@@ -2164,7 +2191,7 @@ SCHEMA:
             try { window.speechSynthesis.cancel(); } catch (_) {}
             finish(false);
           }
-        }, 1200);
+        }, 2500);
 
         u.onstart = () => { started = true; clearTimeout(watchdog); };
         u.onend = () => { clearTimeout(watchdog); finish(started); };
@@ -2174,6 +2201,7 @@ SCHEMA:
           window.speechSynthesis.cancel();
           window.speechSynthesis.resume();
           window.speechSynthesis.speak(u);
+          setTimeout(() => { try { window.speechSynthesis.resume(); } catch (_) {} }, 100);
         } catch (_) {
           clearTimeout(watchdog);
           finish(false);
@@ -2185,9 +2213,9 @@ SCHEMA:
       return new Promise((resolve, reject) => {
         const q = encodeURIComponent(text);
         const urls = [
-          `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-CN&ttsspeed=0.7&q=${q}`,
-          `https://translate.google.com/translate_tts?ie=UTF-8&client=gtx&tl=zh-CN&ttsspeed=0.7&q=${q}`,
-          `https://translate.google.com.vn/translate_tts?ie=UTF-8&client=gtx&tl=zh-CN&ttsspeed=0.7&q=${q}`
+          `https://dict.youdao.com/dictvoice?audio=${q}&type=2`,
+          `https://fanyi.baidu.com/gettts?lan=zh&text=${q}&spd=3&source=web`,
+          `https://translate.google.com/translate_tts?ie=UTF-8&client=gtx&tl=zh-CN&q=${q}`
         ];
         let idx = 0;
 
@@ -2206,13 +2234,23 @@ SCHEMA:
           audio.playbackRate = speechSpeed;
           audio.defaultPlaybackRate = speechSpeed;
 
+          const failTimer = setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              if (activeTtsAudio === audio) activeTtsAudio = null;
+              tryNext();
+            }
+          }, 4000);
+
           audio.onended = () => {
+            clearTimeout(failTimer);
             if (settled) return;
             settled = true;
             if (requestId === ttsRequestId) activeTtsAudio = null;
             resolve(true);
           };
           audio.onerror = () => {
+            clearTimeout(failTimer);
             if (settled) return;
             settled = true;
             if (activeTtsAudio === audio) activeTtsAudio = null;
@@ -2226,6 +2264,7 @@ SCHEMA:
           Promise.resolve(audio.play()).then(() => {
             audio.playbackRate = speechSpeed;
           }).catch(() => {
+            clearTimeout(failTimer);
             if (settled) return;
             settled = true;
             if (activeTtsAudio === audio) activeTtsAudio = null;
@@ -2239,6 +2278,7 @@ SCHEMA:
 
     async function speakHanzi(text) {
       haptic();
+      unlockMobileAudio();
       const cleanText = String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       if (!cleanText) return;
 
@@ -2428,4 +2468,4 @@ SCHEMA:
     }
   </script>
 </body>
-        </html>
+  </html>
